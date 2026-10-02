@@ -1,0 +1,24 @@
+kode_produk,nama_produk,satuan_produk,metode_dasar,d_rata_minggu,sigma_dipakai,lead_time_minggu,sumber_lead_time,safety_stock,reorder_point
+MLB,MINUMAN LIDAH BUAYA,BOTOL,"model (croston_sba), sigma dari residual test",2.22,12.18,0.29,produk (>=3 observasi valid),10.71,11.34
+KKG,KANGKUNG,IKAT,"model (arima), sigma dari residual test",6.81,8.95,0.29,produk (>=3 observasi valid),7.87,9.81
+MDT,MEDIA TANAM,SACK,"model (arima), sigma dari residual test",3.34,3.24,0.29,median global (data produk kurang),2.85,3.8
+CKP,COKLAT PERMEN,GR,"model (croston_sba), sigma dari residual test",2.56,2.75,0.29,median global (data produk kurang),2.42,3.15
+PPK,PUPUK,SACK,"model (arima), sigma dari residual test",0.81,2.84,0.29,median global (data produk kurang),2.49,2.73
+PSK,PISANG KEPOK,SISIR,"model (arima), sigma dari residual test",2.24,1.89,0.29,median global (data produk kurang),1.66,2.3
+PMJ,PERMEN JELLY,GR,"model (arima), sigma dari residual test",0.47,2.41,0.29,median global (data produk kurang),2.12,2.25
+LBP,LABU PRIDA,KG,"model (arima), sigma dari residual test",0.69,2.07,0.29,median global (data produk kurang),1.82,2.01
+JHE,JAHE,GR,"heuristik (rata-rata & std demand mentah train, TANPA model)",0.44,2.0,0.29,median global (data produk kurang),1.76,1.89
+KRY,KERIPIK BAYAM,GR,"heuristik (rata-rata & std demand mentah train, TANPA model)",0.4,2.01,0.29,median global (data produk kurang),1.76,1.88
+LDB,LIDAH BUAYA,KG,"model (arima), sigma dari residual test",0.96,1.67,0.29,produk (>=3 observasi valid),1.47,1.75
+MNM,MINUMAN,BOTOL,"heuristik (rata-rata & std demand mentah train, TANPA model)",0.47,2.67,0.14,produk (>=3 observasi valid),1.66,1.73
+TTL,TEH BUNGA TELANG,GR,"heuristik (rata-rata & std demand mentah train, TANPA model)",0.26,1.61,0.29,median global (data produk kurang),1.41,1.48
+MNT,MINUMAN TIMUN,BOTOL,"heuristik (rata-rata & std demand mentah train, TANPA model)",0.15,1.28,0.29,median global (data produk kurang),1.12,1.17
+KMG,KEMANGI,IKAT,"heuristik (rata-rata & std demand mentah train, TANPA model)",0.18,1.21,0.29,median global (data produk kurang),1.06,1.11
+MNJ,MINUMAN JERUK,BOTOL,"heuristik (rata-rata & std demand mentah train, TANPA model)",0.14,1.16,0.29,median global (data produk kurang),1.02,1.06
+BMG,BAWANG MERAH GORENG,GR,"heuristik (rata-rata & std demand mentah train, TANPA model)",0.09,0.81,0.29,median global (data produk kurang),0.71,0.74
+KCT,KACANG TELOR,GR,"heuristik (rata-rata & std demand mentah train, TANPA model)",0.09,0.81,0.29,median global (data produk kurang),0.72,0.74
+CRG,CIRENG,PCS,"heuristik (rata-rata & std demand mentah train, TANPA model)",0.09,0.81,0.29,median global (data produk kurang),0.72,0.74
+KJG,KERIPIK JAGUNG GEPREK,GR,"heuristik (rata-rata & std demand mentah train, TANPA model)",0.08,0.7,0.29,median global (data produk kurang),0.61,0.64
+RJK,RUJAK KANGKUNG,PORSI,"heuristik (rata-rata & std demand mentah train, TANPA model)",0.07,0.58,0.29,median global (data produk kurang),0.51,0.53
+KRL,KERIPIK LABU,GR,"heuristik (rata-rata & std demand mentah train, TANPA model)",0.05,0.46,0.29,median global (data produk kurang),0.41,0.42
+GRG,GORENGAN,PCS,"heuristik (rata-rata & std demand mentah train, TANPA model)",0.04,0.35,0.29,median global (data produk kurang),0.31,0.32

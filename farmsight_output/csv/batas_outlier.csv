@@ -1,0 +1,39 @@
+kode_produk,metode,n_pos_train,batas_atas
+BLB,IQR per produk,9,21.62741699796951
+BSY,IQR per produk,9,27.284271247461923
+BYM,IQR per produk,31,23.324546104875456
+HSP,IQR per produk,31,114.7407407407407
+JGG,IQR per produk,9,53.5008623784982
+KKG,IQR per produk,35,111.32070319132221
+LDB,IQR per produk,16,13.160117268838125
+MDT,IQR per produk,36,76.94228634059951
+MLB,IQR per produk,13,31.381723240124177
+PLB,IQR per produk,24,150.7372449017775
+PPK,IQR per produk,8,16.42770851179144
+PSK,IQR per produk,14,62.726203747746005
+SAW,IQR per produk,25,34.89440067754303
+SLD,IQR per produk,20,28.23800961527322
+SYR,IQR per produk,8,18.490524512136176
+BMG,tidak dievaluasi (< 2 observasi di train),1,
+CKP,relatif terhadap median (pengali gabungan),7,50.99443052992551
+CRG,tidak dievaluasi (< 2 observasi di train),1,
+GRG,tidak dievaluasi (< 2 observasi di train),1,
+JHE,relatif terhadap median (pengali gabungan),4,50.99443052992551
+KCT,tidak dievaluasi (< 2 observasi di train),1,
+KJG,tidak dievaluasi (< 2 observasi di train),1,
+KMG,relatif terhadap median (pengali gabungan),2,36.829310938279534
+KNK,relatif terhadap median (pengali gabungan),2,16.99814350997517
+KRB,relatif terhadap median (pengali gabungan),7,50.99443052992551
+KRL,tidak dievaluasi (< 2 observasi di train),1,
+KRY,relatif terhadap median (pengali gabungan),3,62.32652620324228
+LBP,relatif terhadap median (pengali gabungan),5,41.92875399127208
+MNJ,tidak dievaluasi (< 2 observasi di train),1,
+MNM,relatif terhadap median (pengali gabungan),4,31.16326310162114
+MNT,tidak dievaluasi (< 2 observasi di train),1,
+PKC,tidak dievaluasi (< 2 observasi di train),1,
+PMJ,relatif terhadap median (pengali gabungan),5,45.328382693267116
+PNP,tidak dievaluasi (< 2 observasi di train),1,
+PYB,tidak dievaluasi (< 2 observasi di train),1,
+RJK,tidak dievaluasi (< 2 observasi di train),1,
+TTL,relatif terhadap median (pengali gabungan),2,53.8274544482547
+URE,tidak dievaluasi (< 2 observasi di train),1,
