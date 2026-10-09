@@ -1,0 +1,52 @@
+{
+  "tanggal_acuan": "2026-10-02",
+  "frekuensi": "mingguan (Senin-Minggu)",
+  "format_tanggal_sumber": "%m/%d/%y",
+  "split": {
+    "akhir_train": "2026-03-30",
+    "rasio": [
+      0.8,
+      0.2
+    ]
+  },
+  "outlier": {
+    "metode": "Tukey IQR pada log1p per produk, dihitung dari train",
+    "k": 1.5,
+    "min_pos": 8,
+    "dicap_pada": [
+      "train"
+    ]
+  },
+  "periode_tidak_tercatat_min_minggu": 4,
+  "buang_tanggal_masa_depan": true,
+  "kelayakan_model": {
+    "min_pos_train": 12,
+    "min_pos_test": 2
+  },
+  "tenaga_kerja": 10,
+  "pemodelan": {
+    "horizon_minggu": 4,
+    "service_level": 0.95,
+    "z_service": 1.6448536269514722,
+    "produk_tier_penuh": [
+      "MDT",
+      "KKG",
+      "LDB",
+      "PSK",
+      "MLB"
+    ],
+    "produk_tier_ringan": [
+      "PPK",
+      "CKP",
+      "PMJ",
+      "LBP"
+    ],
+    "metode_dibandingkan": [
+      "croston_sba",
+      "arima"
+    ],
+    "gunakan_log1p": true,
+    "pakai_regresor_event": true,
+    "statsmodels_tersedia": true
+  }
+}

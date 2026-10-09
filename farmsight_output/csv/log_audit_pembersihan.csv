@@ -1,0 +1,35 @@
+sumber,tahap,aturan,jumlah_baris,tindakan,keterangan
+penjualan,cleaning,header kolom kosong (Unnamed) -> dinamai selisih_hari_csv,1,diperbaiki,
+penjualan,cleaning,baris kosong total,0,dikarantina (dibuang),
+penjualan,cleaning,spasi berlebih / huruf besar-kecil pada nama produk,6,diperbaiki,
+penjualan,cleaning,nama beda pada kode sama -> nama baku,1,diperbaiki,TTL: ES TELANG
+penjualan,cleaning,koma desimal pada jumlah_produk_dibeli,5,diperbaiki (koma -> titik),
+penjualan,cleaning,kolom kunci kosong (kode/tanggal keluar/jumlah),0,dikarantina (dibuang),
+penjualan,cleaning,jumlah_produk_dibeli <= 0,0,dikarantina (dibuang),
+penjualan,cleaning,harga_satuan kosong / <= 0,0,dikarantina (dibuang),
+penjualan,cleaning,"duplikat persis (semua kolom, kecuali nomor baris)",0,dikarantina (dibuang),
+penjualan,cleaning,verifikasi kolom tanpa nama = selisih hari pesan->keluar,0,terverifikasi,cocok 723 dari 723 baris
+penjualan,cleaning,tanggal keluar < tanggal pemesanan,1,ditandai; selisih_hari dikosongkan,
+penjualan,cleaning,total_transaksi != jumlah x harga - diskon,0,ditandai,
+penjualan,cleaning,tanggal barang keluar setelah 2026-10-02 (masa depan),28,dikeluarkan dari pemodelan,"periksa: salah ketik tahun/bulan, atau pesanan terjadwal?"
+penjualan,cleaning,ringkasan,0,selesai,723 baris awal -> 723 baris lolos validitas
+stok,cleaning,header ganda (mis. tanggal_pemesanantanggal_pemesanan),1,diperbaiki,
+stok,cleaning,baris kosong total,0,dikarantina (dibuang),
+stok,cleaning,kode_produk tidak ada di data penjualan,0,ditandai,
+stok,cleaning,kolom kunci kosong,0,dikarantina (dibuang),
+stok,cleaning,jumlah_produk_masuk <= 0,0,dikarantina (dibuang),
+stok,cleaning,demand_aktual_siklus negatif,0,dikarantina (dibuang),
+stok,cleaning,duplikat persis,0,dikarantina (dibuang),
+stok,cleaning,batch ganda (kode_produk + tanggal keluar sama),40,dikarantina (dibuang),
+stok,cleaning,demand siklus > jumlah masuk,0,ditandai,
+stok,cleaning,tanggal keluar < tanggal masuk,0,ditandai,
+stok,cleaning,barang masuk SEBELUM tanggal pemesanan (lead time negatif),76,ditandai; dikecualikan dari perhitungan lead time,kemungkinan tanggal_pemesanan di stok bermakna lain (mis. tanggal pesanan pelanggan) - perlu konfirmasi
+stok,cleaning,stok terpakai < 10% dari yang masuk,31,ditandai,bisa overstock nyata atau salah ketik jumlah masuk
+stok,cleaning,tanggal setelah 2026-10-02 (masa depan),2,dikeluarkan dari pemodelan,
+stok,cleaning,ringkasan,0,selesai,176 baris awal -> 136 baris lolos validitas
+tenaga_kerja,cleaning,validasi,0,ok,jumlah tenaga kerja = 10
+integrasi,integration,produk tidak terjual > 26 minggu terakhir,15,ditandai,"apakah produk dihentikan? jika ya, jangan diprediksi"
+integrasi,integration,satuan penjualan != satuan stok,0,ditandai,
+integrasi,integration,demand_aktual_siklus != jumlah penjualan dalam siklus,50,ditandai,cocok 86 dari 136 batch
+integrasi,integration,"uji integritas (grain, kode yatim, rekonsiliasi total)",0,lolos,
+transformasi,outlier,"outlier IQR(log1p) per produk, batas dari train",2,dicap (winsorize) di train saja,"terdeteksi total 3 (termasuk test, tidak dicap)"
