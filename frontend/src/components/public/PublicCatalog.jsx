@@ -29,16 +29,32 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { PRODUCTS_CATALOG, CATEGORIES } from '../../data/productsData';
+import {
+  getStoredProducts,
+  calculateCategories,
+} from '../../data/productsData';
 import RoleBadge from '../auth/RoleBadge';
 
 export default function PublicCatalog({ onOpenLogin, onGoToDashboard }) {
   const { isAuthenticated, user, role } = useAuth();
+  const [productsList, setProductsList] = useState(getStoredProducts);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [stockFilter, setStockFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('POPULAR');
   const [selectedProduct, setSelectedProduct] = useState(null);
+
+  // Real-time synchronization when Super Admin adds/edits products in staff portal
+  useEffect(() => {
+    const handleProductsUpdate = () => {
+      setProductsList(getStoredProducts());
+    };
+    window.addEventListener('farmsight_products_updated', handleProductsUpdate);
+    return () => window.removeEventListener('farmsight_products_updated', handleProductsUpdate);
+  }, []);
+
+  const categoriesList = calculateCategories(productsList);
+  const activeProducts = productsList.filter((p) => p.isAvailable !== false);
 
   // Scroll to the very top whenever a product detail view is opened or closed
   useEffect(() => {
@@ -97,7 +113,7 @@ export default function PublicCatalog({ onOpenLogin, onGoToDashboard }) {
   };
 
   // Filter products based on search, category, and stock filter
-  const filteredProducts = PRODUCTS_CATALOG.filter((item) => {
+  const filteredProducts = activeProducts.filter((item) => {
     const matchSearch =
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -333,7 +349,7 @@ export default function PublicCatalog({ onOpenLogin, onGoToDashboard }) {
               }}
             >
               <LogIn size={15} />
-              <span>Login Staf</span>
+              <span>Masuk Staf</span>
             </button>
           )}
         </div>
@@ -876,7 +892,7 @@ export default function PublicCatalog({ onOpenLogin, onGoToDashboard }) {
                   WebkitOverflowScrolling: 'touch',
                 }}
               >
-                {CATEGORIES.map((cat) => {
+                {categoriesList.map((cat) => {
                   const isSelected = selectedCategory === cat.id;
                   return (
                     <button

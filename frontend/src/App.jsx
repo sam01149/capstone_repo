@@ -8,6 +8,7 @@ import Sidebar from './components/layout/Sidebar';
 import AccessDenied from './components/layout/AccessDenied';
 import OverviewDashboard from './components/dashboard/OverviewDashboard';
 import UserManagementView from './components/users/UserManagementView';
+import ProductManagementView from './components/products/ProductManagementView';
 import ModulePreview from './components/modules/ModulePreview';
 
 function MainApp() {
@@ -60,6 +61,9 @@ function MainApp() {
     switch (activeTab) {
       case 'dashboard':
         return <OverviewDashboard onNavigate={setActiveTab} />;
+
+      case 'products':
+        return <ProductManagementView onBackToDashboard={() => setActiveTab('dashboard')} />;
 
       case 'users':
         if (!isRole(ROLES.SUPER_ADMIN)) {

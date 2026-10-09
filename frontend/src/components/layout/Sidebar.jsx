@@ -21,36 +21,28 @@ export default function Sidebar({ activeTab, onSelectTab }) {
   const menuItems = [
     {
       id: 'dashboard',
-      label: 'Dashboard Ringkasan',
+      label: 'Dashboard',
       icon: LayoutDashboard,
       allowedRoles: [ROLES.SUPER_ADMIN, ROLES.STOCK_MANAGER, ROLES.SALES_ADMIN],
-      badge: 'Semua',
     },
     {
       id: 'products',
-      label: 'Katalog & Produk',
+      label: 'Manajemen Produk',
       icon: PackageSearch,
-      allowedRoles: [ROLES.SUPER_ADMIN, ROLES.STOCK_MANAGER, ROLES.SALES_ADMIN],
+      allowedRoles: [ROLES.SUPER_ADMIN], // Eksklusif Super Admin
+      badge: 'Super Admin',
     },
     {
       id: 'inventory',
-      label: 'Manajemen Persediaan',
+      label: 'Persediaan & Pergerakan Stok',
       icon: Boxes,
-      allowedRoles: [ROLES.SUPER_ADMIN, ROLES.STOCK_MANAGER],
-      badge: 'Stok',
-    },
-    {
-      id: 'movement',
-      label: 'Pergerakan Stok (In/Out)',
-      icon: ArrowLeftRight,
       allowedRoles: [ROLES.SUPER_ADMIN, ROLES.STOCK_MANAGER],
     },
     {
       id: 'orders',
-      label: 'Pesanan Penjualan',
+      label: 'Manajemen Pesanan',
       icon: ShoppingCart,
       allowedRoles: [ROLES.SUPER_ADMIN, ROLES.SALES_ADMIN],
-      badge: 'Sales',
     },
     {
       id: 'forecasting',
@@ -60,23 +52,23 @@ export default function Sidebar({ activeTab, onSelectTab }) {
     },
     {
       id: 'recommendation',
-      label: 'Rekomendasi Restock',
+      label: 'Rekomendasi Persediaan',
       icon: AlertTriangle,
       allowedRoles: [ROLES.SUPER_ADMIN, ROLES.STOCK_MANAGER],
     },
     {
-      id: 'users',
-      label: 'Manajemen Pengguna',
-      icon: Users,
-      allowedRoles: [ROLES.SUPER_ADMIN], // Strictly Super Admin only!
-      badge: 'Super Admin',
-      restrictedNotice: 'Khusus Super Admin',
-    },
-    {
       id: 'reports',
-      label: 'Laporan & Histori',
+      label: 'Laporan',
       icon: FileBarChart,
       allowedRoles: [ROLES.SUPER_ADMIN, ROLES.STOCK_MANAGER, ROLES.SALES_ADMIN],
+    },
+    {
+      id: 'users',
+      label: 'Manajemen Pengguna & Peran',
+      icon: Users,
+      allowedRoles: [ROLES.SUPER_ADMIN], // Eksklusif Super Admin
+      badge: 'Super Admin',
+      restrictedNotice: 'Khusus Super Admin',
     },
   ];
 

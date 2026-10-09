@@ -1001,12 +1001,56 @@ export const PRODUCTS_CATALOG = [
   },
 ];
 
+// LocalStorage Mock Database for Products
+export const STORAGE_KEY_PRODUCTS = 'farmsight_products_db_v1';
+
+export function formatRupiah(amount) {
+  return `Rp ${Number(amount).toLocaleString('id-ID')}`;
+}
+
+export function getStoredProducts() {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY_PRODUCTS);
+    if (!data) {
+      localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(PRODUCTS_CATALOG));
+      return PRODUCTS_CATALOG;
+    }
+    return JSON.parse(data);
+  } catch {
+    return PRODUCTS_CATALOG;
+  }
+}
+
+export function saveStoredProducts(products) {
+  try {
+    localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(products));
+    // Dispatch custom event to sync in real-time across components in same window
+    window.dispatchEvent(new Event('farmsight_products_updated'));
+  } catch (err) {
+    console.error('Failed to save products db', err);
+  }
+}
+
+export function calculateCategories(productsList = PRODUCTS_CATALOG) {
+  const activeProducts = productsList.filter((p) => p.isAvailable !== false);
+  return [
+    { id: 'all', name: 'Semua Produk', icon: 'Sparkles', count: activeProducts.length },
+    { id: 'camilan', name: 'Camilan & Keripik', icon: 'Wheat', count: activeProducts.filter((p) => p.categorySlug === 'camilan').length },
+    { id: 'olahan', name: 'Olahan Permen & Cokelat', icon: 'Leaf', count: activeProducts.filter((p) => p.categorySlug === 'olahan').length },
+    { id: 'minuman', name: 'Minuman Segar & Teh', icon: 'CupSoda', count: activeProducts.filter((p) => p.categorySlug === 'minuman').length },
+    { id: 'sayur', name: 'Sayuran & Panen Segar', icon: 'Carrot', count: activeProducts.filter((p) => p.categorySlug === 'sayur').length },
+    { id: 'bibit_pupuk', name: 'Bibit & Sarana Tanam', icon: 'Sprout', count: activeProducts.filter((p) => p.categorySlug === 'bibit_pupuk').length },
+  ];
+}
+
 // Helper functions for mock data
 export function getProductById(id) {
-  return PRODUCTS_CATALOG.find((p) => p.id === id);
+  const current = getStoredProducts();
+  return current.find((p) => p.id === id);
 }
 
 export function getProductsByCategory(categorySlug) {
-  if (!categorySlug || categorySlug === 'all') return PRODUCTS_CATALOG;
-  return PRODUCTS_CATALOG.filter((p) => p.categorySlug === categorySlug);
+  const current = getStoredProducts();
+  if (!categorySlug || categorySlug === 'all') return current;
+  return current.filter((p) => p.categorySlug === categorySlug);
 }

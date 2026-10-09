@@ -15,20 +15,11 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Restore session on mount
+  // Initialize app without auto-login so every visit starts fresh on public catalog
   useEffect(() => {
-    const session = getStoredSession();
-    if (session) {
-      // Cross-verify with latest user records in case password or role was changed
-      const currentUsers = getStoredUsers();
-      const matched = currentUsers.find((u) => u.id === session.id);
-      if (matched && matched.status === 'Aktif') {
-        setUser(matched);
-      } else {
-        saveStoredSession(null);
-        setUser(null);
-      }
-    }
+    // Clear any previous persistent session on fresh page loads
+    saveStoredSession(null);
+    setUser(null);
     setLoading(false);
   }, []);
 

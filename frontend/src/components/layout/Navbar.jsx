@@ -19,38 +19,27 @@ import RoleBadge from '../auth/RoleBadge';
 import ChangePassword from '../auth/ChangePassword';
 
 export default function Navbar({ onViewCatalog }) {
-  const { user, role, logout, quickLogin } = useAuth();
+  const { user, role, logout } = useAuth();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showRoleMenu, setShowRoleMenu] = useState(false);
+  const [showNotifMenu, setShowNotifMenu] = useState(false);
   const [isChangePassOpen, setIsChangePassOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
 
   const profileRef = useRef(null);
-  const roleRef = useRef(null);
+  const notifRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (profileRef.current && !profileRef.current.contains(event.target)) {
         setShowProfileMenu(false);
       }
-      if (roleRef.current && !roleRef.current.contains(event.target)) {
-        setShowRoleMenu(false);
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setShowNotifMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const handleRoleSwitch = async (targetRole) => {
-    setShowRoleMenu(false);
-    try {
-      await quickLogin(targetRole);
-      setToastMsg(`Beralih peran ke ${ROLE_DETAILS[targetRole].name}`);
-      setTimeout(() => setToastMsg(''), 3000);
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   return (
     <>
@@ -69,46 +58,32 @@ export default function Navbar({ onViewCatalog }) {
         }}
       >
         {/* Left: Brand Identity with Authentic Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <img
-              src="/images/logo-farm-berkah.jpg"
-              alt="Logo Toko Farm Berkah"
-              style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '10px',
-                objectFit: 'contain',
-                border: '1px solid #d8e2da',
-                backgroundColor: '#ffffff',
-                padding: '2px',
-              }}
-            />
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#142019', letterSpacing: '-0.02em' }}>
-                  Toko Farm Berkah
-                </span>
-                <span
-                  style={{
-                    fontSize: '0.68rem',
-                    fontWeight: 600,
-                    backgroundColor: '#f0fdf4',
-                    color: '#2d6a4f',
-                    padding: '1px 6px',
-                    borderRadius: '4px',
-                    border: '1px solid #bbf7d0',
-                  }}
-                >
-                  Sistem Staf
-                </span>
-              </div>
-              <div style={{ fontSize: '0.7rem', color: '#718277' }}>
-                Komplek Masnaga, Pulo Gebang, Jakarta Timur
-              </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <img
+            src="/images/logo-farm-berkah.jpg"
+            alt="Logo Toko Farm Berkah"
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              objectFit: 'contain',
+              border: '1px solid #d8e2da',
+              backgroundColor: '#ffffff',
+              padding: '2px',
+            }}
+          />
+          <div>
+            <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#142019', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+              Toko Farm Berkah
+            </div>
+            <div style={{ fontSize: '0.7rem', color: '#718277' }}>
+              Komplek Masnaga, Pulo Gebang, Jakarta Timur
             </div>
           </div>
+        </div>
 
+        {/* Right: Actions, Notifications, & User Profile Menu */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           {/* Quick link to view public catalog */}
           {onViewCatalog && (
             <button
@@ -117,145 +92,127 @@ export default function Navbar({ onViewCatalog }) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                padding: '5px 10px',
-                borderRadius: '8px',
-                border: '1px solid #e1e7e2',
-                background: '#f8faf8',
-                color: '#2d6a4f',
-                fontSize: '0.78rem',
+                padding: '7px 14px',
+                borderRadius: '20px',
+                border: '1px solid #d8e2da',
+                backgroundColor: '#ffffff',
+                color: '#1b4332',
+                fontSize: '0.8rem',
                 fontWeight: 600,
                 cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#edf7f0';
+                e.currentTarget.style.borderColor = '#2d6a4f';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#ffffff';
+                e.currentTarget.style.borderColor = '#d8e2da';
               }}
               title="Buka tampilan katalog publik untuk pelanggan"
             >
-              <Store size={14} />
+              <Store size={14} color="#2d6a4f" />
               <span>Lihat Katalog Publik</span>
             </button>
           )}
-        </div>
 
-        {/* Right: Quick Role Switcher, Notification, and User Menu */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          {/* Quick Role Switcher Dropdown */}
-          <div style={{ position: 'relative' }} ref={roleRef}>
+          {/* FR-NA1 s/d NA5: Notifications Popover */}
+          <div style={{ position: 'relative' }} ref={notifRef}>
             <button
-              onClick={() => setShowRoleMenu(!showRoleMenu)}
+              onClick={() => setShowNotifMenu(!showNotifMenu)}
               style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                border: '1px solid #d8e2da',
+                backgroundColor: showNotifMenu ? '#edf7f0' : '#ffffff',
+                color: '#142019',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
-                padding: '6px 12px',
-                borderRadius: '8px',
-                border: '1px solid #d1d9d3',
-                background: '#f8faf8',
+                justifyContent: 'center',
                 cursor: 'pointer',
-                fontSize: '0.825rem',
-                fontWeight: 600,
-                color: '#142019',
+                position: 'relative',
+                transition: 'all 0.15s',
               }}
-              title="Ganti peran untuk pengujian akses RBAC"
+              title="Notifikasi Operasional (FR-NA)"
             >
-              <span style={{ fontSize: '0.75rem', color: '#718277' }}>Peran Aktif:</span>
-              <RoleBadge role={role} size="sm" />
-              <ChevronDown size={14} color="#718277" />
+              <Bell size={17} color="#2d6a4f" />
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '-2px',
+                  right: '-2px',
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '50%',
+                  backgroundColor: '#dc2626',
+                  color: '#ffffff',
+                  fontSize: '0.65rem',
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '2px solid #ffffff',
+                }}
+              >
+                3
+              </span>
             </button>
 
-            {showRoleMenu && (
+            {showNotifMenu && (
               <div
                 style={{
                   position: 'absolute',
                   right: 0,
                   top: '115%',
-                  width: '280px',
+                  width: '320px',
                   backgroundColor: '#ffffff',
                   borderRadius: '12px',
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px #e1e7e2',
-                  padding: '8px',
-                  zIndex: 101,
+                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 0 0 1px #e1e7e2',
+                  padding: '12px',
+                  zIndex: 102,
                 }}
                 className="animate-slide-down"
               >
-                <div style={{ padding: '6px 10px 8px 10px', borderBottom: '1px solid #f0f4f1' }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#718277', textTransform: 'uppercase' }}>
-                    Ganti Peran Pengguna (RBAC Demo)
-                  </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '8px', borderBottom: '1px solid #f0f4f1', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#142019' }}>Notifikasi Operasional</span>
+                  <span style={{ fontSize: '0.7rem', color: '#2d6a4f', fontWeight: 600 }}>3 Baru</span>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
-                  <button
-                    onClick={() => handleRoleSwitch(ROLES.SUPER_ADMIN)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      width: '100%',
-                      padding: '8px 10px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      background: role === ROLES.SUPER_ADMIN ? '#f0fdf4' : '#ffffff',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Shield size={16} color="#1b4332" />
-                      <div>
-                        <div style={{ fontSize: '0.825rem', fontWeight: 600, color: '#142019' }}>Super Admin</div>
-                        <div style={{ fontSize: '0.7rem', color: '#718277' }}>Ibu Intan Permatasari</div>
-                      </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto' }}>
+                  {/* Notification 1: Low Stock Alert (FR-NA1) */}
+                  <div style={{ padding: '8px 10px', borderRadius: '8px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', fontSize: '0.78rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#dc2626', fontWeight: 700, marginBottom: '2px' }}>
+                      <span>⚠️ Stok Kritis (Low Stock)</span>
+                      <span style={{ fontSize: '0.68rem', color: '#991b1b' }}>10 mnt lalu</span>
                     </div>
-                    {role === ROLES.SUPER_ADMIN && <Check size={14} color="#16a34a" />}
-                  </button>
+                    <p style={{ margin: 0, color: '#450a0a', lineHeight: 1.35 }}>
+                      <strong>Minuman Jelly Telang</strong> tersisa <strong>6 pcs</strong> (di bawah Safety Stock 8 pcs).
+                    </p>
+                  </div>
 
-                  <button
-                    onClick={() => handleRoleSwitch(ROLES.STOCK_MANAGER)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      width: '100%',
-                      padding: '8px 10px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      background: role === ROLES.STOCK_MANAGER ? '#ecfdf5' : '#ffffff',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Package size={16} color="#065f46" />
-                      <div>
-                        <div style={{ fontSize: '0.825rem', fontWeight: 600, color: '#142019' }}>Stock Manager</div>
-                        <div style={{ fontSize: '0.7rem', color: '#718277' }}>Budi Santoso</div>
-                      </div>
+                  {/* Notification 2: Reorder Point Warning (FR-NA2) */}
+                  <div style={{ padding: '8px 10px', borderRadius: '8px', backgroundColor: '#fffbeb', border: '1px solid #fde68a', fontSize: '0.78rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#b45309', fontWeight: 700, marginBottom: '2px' }}>
+                      <span>⚡ Peringatan Reorder Point</span>
+                      <span style={{ fontSize: '0.68rem', color: '#78350f' }}>1 jam lalu</span>
                     </div>
-                    {role === ROLES.STOCK_MANAGER && <Check size={14} color="#16a34a" />}
-                  </button>
+                    <p style={{ margin: 0, color: '#451a03', lineHeight: 1.35 }}>
+                      <strong>Permen Lidah Buaya</strong> mencapai batas ROP (12 pcs). Disarankan order restock.
+                    </p>
+                  </div>
 
-                  <button
-                    onClick={() => handleRoleSwitch(ROLES.SALES_ADMIN)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      width: '100%',
-                      padding: '8px 10px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      background: role === ROLES.SALES_ADMIN ? '#fffbeb' : '#ffffff',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <ShoppingCart size={16} color="#92400e" />
-                      <div>
-                        <div style={{ fontSize: '0.825rem', fontWeight: 600, color: '#142019' }}>Sales Admin</div>
-                        <div style={{ fontSize: '0.7rem', color: '#718277' }}>Siti Rahmawati</div>
-                      </div>
+                  {/* Notification 3: New Order (FR-NA3) */}
+                  <div style={{ padding: '8px 10px', borderRadius: '8px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', fontSize: '0.78rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#16a34a', fontWeight: 700, marginBottom: '2px' }}>
+                      <span>🛒 Pesanan Baru Masuk</span>
+                      <span style={{ fontSize: '0.68rem', color: '#166534' }}>2 jam lalu</span>
                     </div>
-                    {role === ROLES.SALES_ADMIN && <Check size={14} color="#16a34a" />}
-                  </button>
+                    <p style={{ margin: 0, color: '#052e16', lineHeight: 1.35 }}>
+                      Pesanan <strong>ORD-2026-081</strong> (10x Keripik Labu) menunggu verifikasi sales.
+                    </p>
+                  </div>
                 </div>
               </div>
             )}

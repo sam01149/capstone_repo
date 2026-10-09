@@ -12,7 +12,6 @@ export const ROLE_DETAILS = {
     id: ROLES.SUPER_ADMIN,
     name: 'Super Admin',
     label: 'Pemilik & Super Admin',
-    description: 'Akses penuh ke seluruh sistem, master data produk, inventaris, peramalan, laporan, dan manajemen pengguna.',
     color: '#1b4332',
     bg: '#d8f3dc',
     border: '#74c69d',
