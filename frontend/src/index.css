@@ -1,0 +1,125 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Brand Color Palette - FarmSight Organic Modern */
+  --primary-900: #0f291e;
+  --primary-800: #1b4332;
+  --primary-700: #2d6a4f;
+  --primary-600: #387c5b;
+  --primary-500: #40916c;
+  --primary-400: #52b788;
+  --primary-300: #74c69d;
+  --primary-200: #95d5b2;
+  --primary-100: #d8f3dc;
+  --primary-50: #f0fdf4;
+
+  /* Accent Amber (Harvest / Warning / Highlights) */
+  --accent-700: #b45309;
+  --accent-600: #d97706;
+  --accent-500: #f59e0b;
+  --accent-100: #fef3c7;
+  --accent-50: #fffbeb;
+
+  /* Status Colors */
+  --success-600: #16a34a;
+  --success-100: #dcfce7;
+  --success-50: #f0fdf4;
+
+  --warning-600: #ca8a04;
+  --warning-100: #fef9c3;
+  --warning-50: #fefce8;
+
+  --danger-600: #dc2626;
+  --danger-100: #fee2e2;
+  --danger-50: #fef2f2;
+
+  --info-600: #0284c7;
+  --info-100: #e0f2fe;
+
+  /* Neutral Slate / Earthy Tones */
+  --surface-bg: #f4f6f4;
+  --surface-card: #ffffff;
+  --surface-subtle: #f8faf8;
+  --surface-border: #e1e7e2;
+  --surface-border-focus: #2d6a4f;
+
+  --text-main: #142019;
+  --text-secondary: #48564e;
+  --text-muted: #718277;
+  --text-light: #ffffff;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(18, 38, 28, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(18, 38, 28, 0.08), 0 2px 4px -2px rgba(18, 38, 28, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(18, 38, 28, 0.09), 0 4px 6px -4px rgba(18, 38, 28, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(18, 38, 28, 0.1), 0 8px 10px -6px rgba(18, 38, 28, 0.05);
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Font Family */
+  --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--surface-bg);
+  color: var(--text-main);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+input, button, select, textarea {
+  font-family: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f2;
+}
+::-webkit-scrollbar-thumb {
+  background: #c3d2c7;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #95a89b;
+}
+
+/* Utility Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-down {
+  animation: slideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
