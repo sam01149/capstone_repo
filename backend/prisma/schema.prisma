@@ -1,0 +1,79 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Role {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique @db.VarChar(32)
+  name      String   @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  users     User[]
+
+  @@map("roles")
+}
+
+model User {
+  id                         String     @id @default(uuid()) @db.Uuid
+  name                       String     @db.VarChar(120)
+  email                      String     @db.VarChar(254)
+  emailNormalized            String     @unique @map("email_normalized") @db.VarChar(254)
+  passwordHash               String     @map("password_hash") @db.VarChar(255)
+  roleId                     String     @map("role_id") @db.Uuid
+  isActive                   Boolean    @default(true) @map("is_active")
+  mustChangePassword         Boolean    @default(false) @map("must_change_password")
+  temporaryPasswordExpiresAt DateTime?  @map("temporary_password_expires_at") @db.Timestamptz(6)
+  lastLoginAt                DateTime?  @map("last_login_at") @db.Timestamptz(6)
+  passwordChangedAt          DateTime   @default(now()) @map("password_changed_at") @db.Timestamptz(6)
+  createdAt                  DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                  DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  role                       Role       @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  sessions                   Session[]
+  auditLogs                  AuditLog[] @relation("AuditActor")
+
+  @@index([roleId])
+  @@index([isActive])
+  @@map("users")
+}
+
+model Session {
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  refreshTokenHash  String    @unique @map("refresh_token_hash") @db.Char(64)
+  csrfTokenHash     String    @map("csrf_token_hash") @db.Char(64)
+  absoluteExpiresAt DateTime  @map("absolute_expires_at") @db.Timestamptz(6)
+  idleExpiresAt     DateTime  @map("idle_expires_at") @db.Timestamptz(6)
+  lastSeenAt        DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamptz(6)
+  revocationReason  String?   @map("revocation_reason") @db.VarChar(100)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([absoluteExpiresAt])
+  @@index([idleExpiresAt])
+  @@map("sessions")
+}
+
+model AuditLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  actorUserId  String?  @map("actor_user_id") @db.Uuid
+  action       String   @db.VarChar(80)
+  targetType   String?  @map("target_type") @db.VarChar(50)
+  targetId     String?  @map("target_id") @db.VarChar(100)
+  requestId    String?  @map("request_id") @db.VarChar(100)
+  safeMetadata Json?    @map("safe_metadata")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  actor        User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
