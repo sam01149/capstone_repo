@@ -53,10 +53,7 @@ export class SessionService {
       if (
         !user ||
         !user.isActive ||
-        user.passwordHash !== verifiedPasswordHash ||
-        (user.mustChangePassword &&
-          user.temporaryPasswordExpiresAt &&
-          user.temporaryPasswordExpiresAt <= now)
+        user.passwordHash !== verifiedPasswordHash
       ) {
         return null;
       }
@@ -133,18 +130,6 @@ export class SessionService {
         ) {
           return null;
         }
-        if (
-          session.user.mustChangePassword &&
-          session.user.temporaryPasswordExpiresAt &&
-          session.user.temporaryPasswordExpiresAt <= now
-        ) {
-          await tx.session.update({
-            where: { id: session.id },
-            data: { revokedAt: now, revocationReason: 'TEMP_PASSWORD_EXPIRED' },
-          });
-          return null;
-        }
-
         const idleExpiresAt = new Date(
           Math.min(
             now.getTime() + this.idleTtlMs,
@@ -228,6 +213,7 @@ export class SessionService {
       name: string;
       email: string;
       mustChangePassword: boolean;
+      passwordChangedAt: Date;
       role: { code: string };
     },
     refreshToken: string,
@@ -250,6 +236,7 @@ export class SessionService {
         email: user.email,
         role,
         mustChangePassword: user.mustChangePassword,
+        passwordChangedAt: user.passwordChangedAt.toISOString(),
       },
     };
   }

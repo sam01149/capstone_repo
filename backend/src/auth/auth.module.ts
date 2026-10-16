@@ -8,7 +8,6 @@ import { AuthCookieService } from './cookie.service.js';
 import { PasswordService } from './password.service.js';
 import { SessionService } from './session.service.js';
 import { TokenService } from './token.service.js';
-import { UsersController } from './users.controller.js';
 
 @Module({
   imports: [
@@ -29,7 +28,7 @@ import { UsersController } from './users.controller.js';
       }),
     }),
   ],
-  controllers: [AuthController, UsersController],
+  controllers: [AuthController],
   providers: [
     AuthGuard,
     AuthService,
@@ -38,6 +37,6 @@ import { UsersController } from './users.controller.js';
     SessionService,
     TokenService,
   ],
-  exports: [AuthGuard],
+  exports: [AuthGuard, PasswordService],
 })
 export class AuthModule {}

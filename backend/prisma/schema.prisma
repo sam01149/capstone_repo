@@ -28,7 +28,6 @@ model User {
   roleId                     String     @map("role_id") @db.Uuid
   isActive                   Boolean    @default(true) @map("is_active")
   mustChangePassword         Boolean    @default(false) @map("must_change_password")
-  temporaryPasswordExpiresAt DateTime?  @map("temporary_password_expires_at") @db.Timestamptz(6)
   lastLoginAt                DateTime?  @map("last_login_at") @db.Timestamptz(6)
   passwordChangedAt          DateTime   @default(now()) @map("password_changed_at") @db.Timestamptz(6)
   createdAt                  DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -75,5 +74,6 @@ model AuditLog {
 
   @@index([actorUserId, createdAt])
   @@index([action, createdAt])
+  @@index([targetType, targetId, createdAt])
   @@map("audit_logs")
 }

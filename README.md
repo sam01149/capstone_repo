@@ -15,4 +15,4 @@ Tanggung jawab tidak membatasi kolaborasi, tetapi setiap perubahan tetap harus m
 
 ## Status implementasi
 
-Source backend berada di `backend/`. Fondasi API, model autentikasi, login email, sesi yang dapat dicabut, CSRF, RBAC tiga role, ganti password, reset oleh Super Admin, audit, migration, dan test PostgreSQL sudah tersedia. Frontend tidak diubah. Instruksi menjalankan aplikasi dan membuat Super Admin pertama terdapat di `backend/README.md`.
+Source backend berada di `backend/`. Fondasi API, autentikasi, sesi yang dapat dicabut, CSRF, RBAC tiga role, serta pengelolaan pengguna internal lengkap sudah tersedia. Super Admin dapat melihat, membuat, memperbarui, mengubah role, menonaktifkan, mereset password, dan melihat aktivitas staf. Reset memakai password 8–16 karakter tanpa expiry; `mustChangePassword` menjadi penanda saran non-blocking. Frontend tidak diubah. Instruksi menjalankan aplikasi dan membuat Super Admin pertama terdapat di `backend/README.md`.

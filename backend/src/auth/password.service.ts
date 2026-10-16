@@ -44,13 +44,4 @@ export class PasswordService implements OnModuleInit {
       parallelism: 1,
     });
   }
-
-  generateTemporaryPassword(): string {
-    const alphabet =
-      'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
-    const bytes = randomBytes(16);
-    return Array.from(bytes, (value) => alphabet[value % alphabet.length]).join(
-      '',
-    );
-  }
 }

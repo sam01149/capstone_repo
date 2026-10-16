@@ -1,6 +1,6 @@
 # FarmSight Backend
 
-Backend FarmSight menggunakan NestJS, Prisma ORM, dan PostgreSQL. Autentikasi/RBAC staf telah tersedia; frontend, CRUD pengguna lengkap, dan modul bisnis lain dikerjakan pada paket terpisah.
+Backend FarmSight menggunakan NestJS, Prisma ORM, dan PostgreSQL. Autentikasi/RBAC serta pengelolaan pengguna internal telah tersedia; frontend dan modul bisnis lain dikerjakan pada paket terpisah.
 
 ## Stack yang dipin
 
@@ -124,7 +124,7 @@ Environment bersama atau production hanya menjalankan migration yang sudah ada:
 npm run db:migrate:deploy
 ```
 
-Migration pertama sudah membuat `roles`, `users`, `sessions`, dan `audit_logs`. Karena role aplikasi tidak memiliki `CREATEDB`, development lokal dapat memakai migration SQL yang sudah direview melalui `db:migrate:deploy`; jangan menaikkan hak role hanya agar shadow database Prisma tersedia.
+Migration pertama membuat `roles`, `users`, `sessions`, dan `audit_logs`. Migration `20261016090000_internal_users_password_policy` menghapus expiry password sementara dan menambah indeks activity pengguna. Karena role aplikasi tidak memiliki `CREATEDB`, development lokal dapat memakai migration SQL yang sudah direview melalui `db:migrate:deploy`; jangan menaikkan hak role hanya agar shadow database Prisma tersedia.
 
 Super Admin pertama dibuat satu kali tanpa password default. Isi tiga environment sementara berikut dengan nilai nyata, jalankan command, lalu hapus environment prosesnya: `BOOTSTRAP_SUPER_ADMIN_NAME`, `BOOTSTRAP_SUPER_ADMIN_EMAIL`, dan `BOOTSTRAP_SUPER_ADMIN_PASSWORD`.
 
@@ -179,6 +179,18 @@ Route bisnis berikutnya akan berada di bawah prefix `/api/v1`. Health check seng
 - `GET /api/v1/auth/me`
 - `POST /api/v1/auth/logout`
 - `POST /api/v1/auth/change-password`
-- `POST /api/v1/users/:id/reset-password` khusus Super Admin
+
+Endpoint pengguna berikut khusus Super Admin:
+
+- `GET /api/v1/users`
+- `GET /api/v1/users/:id`
+- `POST /api/v1/users`
+- `PATCH /api/v1/users/:id`
+- `PATCH /api/v1/users/:id/role`
+- `POST /api/v1/users/:id/deactivate`
+- `POST /api/v1/users/:id/reset-password`
+- `GET /api/v1/users/:id/activity`
+
+Password baru pada create/reset/change wajib sepanjang 8–16 karakter. Reset menerima password dari Super Admin, mencabut sesi target, serta menetapkan `mustChangePassword=true` sebagai penanda saran non-blocking tanpa expiry. Backend tidak mengembalikan password dan tidak menyediakan endpoint untuk tombol X banner; tombol tersebut sepenuhnya dikelola frontend.
 
 Frontend harus memakai `credentials: 'include'` dan mengirim `X-CSRF-Token` pada mutation privat.

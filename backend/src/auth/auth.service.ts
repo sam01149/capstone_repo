@@ -1,5 +1,4 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { createHash } from 'node:crypto';
 import { ApiError } from '../common/http/api-error.js';
 import { Prisma } from '../generated/prisma/client.js';
@@ -12,17 +11,11 @@ import { SessionService, type IssuedSession } from './session.service.js';
 
 @Injectable()
 export class AuthService {
-  private readonly temporaryPasswordTtlMs: number;
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly passwords: PasswordService,
     private readonly sessions: SessionService,
-    config: ConfigService,
-  ) {
-    this.temporaryPasswordTtlMs =
-      config.getOrThrow<number>('TEMP_PASSWORD_TTL_SECONDS') * 1000;
-  }
+  ) {}
 
   async login(dto: LoginDto, requestId: string): Promise<IssuedSession> {
     const emailNormalized = dto.email.trim().toLowerCase();
@@ -33,12 +26,7 @@ export class AuthService {
     const passwordValid = user
       ? await this.passwords.verify(user.passwordHash, dto.password)
       : await this.passwords.verifyDummy(dto.password);
-    const temporaryPasswordValid =
-      !user?.mustChangePassword ||
-      !user.temporaryPasswordExpiresAt ||
-      user.temporaryPasswordExpiresAt > new Date();
-
-    if (!user || !passwordValid || !user.isActive || !temporaryPasswordValid) {
+    if (!user || !passwordValid || !user.isActive) {
       await this.recordFailedLogin(emailNormalized, requestId);
       throw new ApiError(
         HttpStatus.UNAUTHORIZED,
@@ -100,7 +88,6 @@ export class AuthService {
           data: {
             passwordHash: newHash,
             mustChangePassword: false,
-            temporaryPasswordExpiresAt: null,
             passwordChangedAt: now,
           },
         });
@@ -120,58 +107,6 @@ export class AuthService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
-  }
-
-  async resetPassword(
-    actor: AuthPrincipal,
-    targetUserId: string,
-    requestId: string,
-  ): Promise<{ temporaryPassword: string; expiresAt: string }> {
-    const temporaryPassword = this.passwords.generateTemporaryPassword();
-    const passwordHash = await this.passwords.hash(temporaryPassword);
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + this.temporaryPasswordTtlMs);
-
-    await this.prisma.$transaction(
-      async (tx) => {
-        await tx.$queryRaw`SELECT id FROM users WHERE id = ${targetUserId}::uuid FOR UPDATE`;
-        const target = await tx.user.findUnique({
-          where: { id: targetUserId },
-        });
-        if (!target || !target.isActive) {
-          throw new ApiError(
-            HttpStatus.NOT_FOUND,
-            'USER_NOT_FOUND',
-            'Akun staf aktif tidak ditemukan.',
-          );
-        }
-        await tx.user.update({
-          where: { id: target.id },
-          data: {
-            passwordHash,
-            mustChangePassword: true,
-            temporaryPasswordExpiresAt: expiresAt,
-            passwordChangedAt: now,
-          },
-        });
-        await tx.session.updateMany({
-          where: { userId: target.id, revokedAt: null },
-          data: { revokedAt: now, revocationReason: 'PASSWORD_RESET' },
-        });
-        await tx.auditLog.create({
-          data: {
-            actorUserId: actor.userId,
-            action: 'AUTH_PASSWORD_RESET',
-            targetType: 'USER',
-            targetId: target.id,
-            requestId,
-          },
-        });
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
-
-    return { temporaryPassword, expiresAt: expiresAt.toISOString() };
   }
 
   private async recordFailedLogin(email: string, requestId: string) {

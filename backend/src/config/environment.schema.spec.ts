@@ -23,7 +23,6 @@ describe('validateEnvironment', () => {
       ACCESS_TOKEN_TTL_SECONDS: 900,
       SESSION_IDLE_TTL_SECONDS: 7200,
       SESSION_ABSOLUTE_TTL_SECONDS: 43200,
-      TEMP_PASSWORD_TTL_SECONDS: 86400,
     });
   });
 
