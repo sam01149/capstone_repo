@@ -12,4 +12,3 @@ export const CSRF_COOKIE = 'farmsight_csrf';
 
 export const IS_PUBLIC_KEY = 'isPublic';
 export const ROLES_KEY = 'roles';
-export const ALLOW_PASSWORD_CHANGE_KEY = 'allowPasswordChange';

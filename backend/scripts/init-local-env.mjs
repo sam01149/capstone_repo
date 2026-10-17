@@ -33,7 +33,6 @@ setValue('COOKIE_SECURE', currentValue('COOKIE_SECURE') || 'false');
 setValue('ACCESS_TOKEN_TTL_SECONDS', '900');
 setValue('SESSION_IDLE_TTL_SECONDS', '7200');
 setValue('SESSION_ABSOLUTE_TTL_SECONDS', '43200');
-setValue('TEMP_PASSWORD_TTL_SECONDS', '86400');
 
 const whatsapp = process.env.FARMSIGHT_LOCAL_WHATSAPP_NUMBER;
 if (whatsapp) {

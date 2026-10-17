@@ -10,7 +10,6 @@ describe('FarmSight auth API (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let passwords: PasswordService;
-  let adminId: string;
   let staffId: string;
 
   beforeAll(async () => {
@@ -43,7 +42,7 @@ describe('FarmSight auth API (e2e)', () => {
         data: { code: 'STOCK_MANAGER', name: 'Stock Manager' },
       }),
     ]);
-    const [admin, staff] = await Promise.all([
+    const [, staff] = await Promise.all([
       prisma.user.create({
         data: {
           name: 'Admin Test',
@@ -62,18 +61,17 @@ describe('FarmSight auth API (e2e)', () => {
           roleId: salesRole.id,
         },
       }),
+      prisma.user.create({
+        data: {
+          name: 'Stock Test',
+          email: 'stock@example.test',
+          emailNormalized: 'stock@example.test',
+          passwordHash: await passwords.hash('StockPassword123'),
+          roleId: stockRole.id,
+        },
+      }),
     ]);
-    adminId = admin.id;
     staffId = staff.id;
-    await prisma.user.create({
-      data: {
-        name: 'Stock Test',
-        email: 'stock@example.test',
-        emailNormalized: 'stock@example.test',
-        passwordHash: await passwords.hash('StockPassword123'),
-        roleId: stockRole.id,
-      },
-    });
   });
 
   it('health tetap publik dengan envelope dan request ID', async () => {
@@ -111,83 +109,49 @@ describe('FarmSight auth API (e2e)', () => {
     expect(response.body.data.user.role).toBe('STOCK_MANAGER');
   });
 
-  it('menegakkan login, RBAC, reset, ganti password, revocation, dan logout', async () => {
-    const staffAgent = request.agent(app.getHttpServer());
-    const staffLogin = await staffAgent
+  it('menegakkan login, refresh, CSRF, ganti password, dan logout', async () => {
+    const agent = request.agent(app.getHttpServer());
+    const login = await agent
       .post('/api/v1/auth/login')
       .send({ email: 'STAFF@example.test', password: 'StaffPassword123' })
       .expect(200);
-    let staffCsrf = staffLogin.body.data.csrfToken as string;
-    expect(staffLogin.body.data.user).toMatchObject({
+    let csrf = login.body.data.csrfToken as string;
+    expect(login.body.data.user).toMatchObject({
       id: staffId,
       role: 'SALES_ADMIN',
       mustChangePassword: false,
     });
-    expect(staffLogin.body.data.user).not.toHaveProperty('sessionId');
-    const originalCookies = (
-      staffLogin.headers['set-cookie'] as unknown as string[]
-    )
+    expect(login.body.data.user).not.toHaveProperty('sessionId');
+
+    const originalCookies = (login.headers['set-cookie'] as unknown as string[])
       .map((cookie) => cookie.split(';', 1)[0])
       .join('; ');
-    const refreshed = await staffAgent
+    const refreshed = await agent
       .post('/api/v1/auth/refresh')
-      .set('x-csrf-token', staffCsrf)
+      .set('x-csrf-token', csrf)
       .expect(200);
-    staffCsrf = refreshed.body.data.csrfToken as string;
+    csrf = refreshed.body.data.csrfToken as string;
     await request(app.getHttpServer())
       .post('/api/v1/auth/refresh')
       .set('Cookie', originalCookies)
-      .set('x-csrf-token', staffLogin.body.data.csrfToken as string)
+      .set('x-csrf-token', login.body.data.csrfToken as string)
       .expect(401);
-    await staffAgent.get('/api/v1/auth/me').expect(200);
-    await staffAgent
-      .post(`/api/v1/users/${adminId}/reset-password`)
-      .set('x-csrf-token', staffCsrf)
-      .expect(403);
-
-    const adminAgent = request.agent(app.getHttpServer());
-    const adminLogin = await adminAgent
-      .post('/api/v1/auth/login')
-      .send({ email: 'admin@example.test', password: 'AdminPassword123' })
-      .expect(200);
-    const adminCsrf = adminLogin.body.data.csrfToken as string;
-    await adminAgent
-      .post(`/api/v1/users/${staffId}/reset-password`)
-      .expect(403);
-    const reset = await adminAgent
-      .post(`/api/v1/users/${staffId}/reset-password`)
-      .set('x-csrf-token', adminCsrf)
-      .expect(200);
-    const temporaryPassword = reset.body.data.temporaryPassword as string;
-    expect(temporaryPassword).toHaveLength(16);
-    expect(reset.body.data.expiresAt).toEqual(expect.any(String));
-    await staffAgent.get('/api/v1/auth/me').expect(401);
-
-    const temporaryAgent = request.agent(app.getHttpServer());
-    const temporaryLogin = await temporaryAgent
-      .post('/api/v1/auth/login')
-      .send({ email: 'staff@example.test', password: temporaryPassword })
-      .expect(200);
-    const temporaryCsrf = temporaryLogin.body.data.csrfToken as string;
-    expect(temporaryLogin.body.data.user.mustChangePassword).toBe(true);
-    await temporaryAgent.get('/api/v1/auth/me').expect(403);
-    await temporaryAgent
+    await agent.get('/api/v1/auth/me').expect(200);
+    await agent.post('/api/v1/auth/change-password').expect(403);
+    await agent
       .post('/api/v1/auth/change-password')
-      .set('x-csrf-token', temporaryCsrf)
+      .set('x-csrf-token', csrf)
       .send({
-        currentPassword: temporaryPassword,
-        newPassword: 'NewStaffPassword123',
+        currentPassword: 'StaffPassword123',
+        newPassword: 'NewPassWord12345',
       })
       .expect(200);
+    await agent.get('/api/v1/auth/me').expect(401);
 
-    await request(app.getHttpServer())
-      .post('/api/v1/auth/login')
-      .send({ email: 'staff@example.test', password: temporaryPassword })
-      .expect(401);
     const finalAgent = request.agent(app.getHttpServer());
     const finalLogin = await finalAgent
       .post('/api/v1/auth/login')
-      .send({ email: 'staff@example.test', password: 'NewStaffPassword123' })
+      .send({ email: 'staff@example.test', password: 'NewPassWord12345' })
       .expect(200);
     const finalCsrf = finalLogin.body.data.csrfToken as string;
     await finalAgent
@@ -198,22 +162,33 @@ describe('FarmSight auth API (e2e)', () => {
     await finalAgent.get('/api/v1/auth/me').expect(401);
   });
 
-  it('menolak akun nonaktif, password sementara kedaluwarsa, dan token rusak', async () => {
+  it('menolak password baru di luar 8 sampai 16 karakter', async () => {
+    const agent = request.agent(app.getHttpServer());
+    const login = await agent
+      .post('/api/v1/auth/login')
+      .send({ email: 'staff@example.test', password: 'StaffPassword123' })
+      .expect(200);
+    const csrf = login.body.data.csrfToken as string;
+    await agent
+      .post('/api/v1/auth/change-password')
+      .set('x-csrf-token', csrf)
+      .send({ currentPassword: 'StaffPassword123', newPassword: 'Pendek1' })
+      .expect(400);
+    await agent
+      .post('/api/v1/auth/change-password')
+      .set('x-csrf-token', csrf)
+      .send({
+        currentPassword: 'StaffPassword123',
+        newPassword: 'TerlaluPanjang12345',
+      })
+      .expect(400);
+    await agent.get('/api/v1/auth/me').expect(200);
+  });
+
+  it('menolak akun nonaktif dan access token rusak', async () => {
     await prisma.user.update({
       where: { id: staffId },
       data: { isActive: false },
-    });
-    await request(app.getHttpServer())
-      .post('/api/v1/auth/login')
-      .send({ email: 'staff@example.test', password: 'StaffPassword123' })
-      .expect(401);
-    await prisma.user.update({
-      where: { id: staffId },
-      data: {
-        isActive: true,
-        mustChangePassword: true,
-        temporaryPasswordExpiresAt: new Date(Date.now() - 1_000),
-      },
     });
     await request(app.getHttpServer())
       .post('/api/v1/auth/login')
@@ -223,54 +198,6 @@ describe('FarmSight auth API (e2e)', () => {
       .get('/api/v1/auth/me')
       .set('Cookie', 'farmsight_access=not-a-jwt')
       .expect(401);
-  });
-
-  it('melakukan rollback reset bila penulisan audit gagal', async () => {
-    const staffAgent = request.agent(app.getHttpServer());
-    await staffAgent
-      .post('/api/v1/auth/login')
-      .send({ email: 'staff@example.test', password: 'StaffPassword123' })
-      .expect(200);
-    const before = await prisma.user.findUniqueOrThrow({
-      where: { id: staffId },
-      select: { passwordHash: true },
-    });
-    const adminAgent = request.agent(app.getHttpServer());
-    const login = await adminAgent
-      .post('/api/v1/auth/login')
-      .send({ email: 'admin@example.test', password: 'AdminPassword123' })
-      .expect(200);
-    await prisma.$executeRawUnsafe(`
-      CREATE OR REPLACE FUNCTION fail_auth_reset_audit() RETURNS trigger AS $$
-      BEGIN
-        IF NEW.action = 'AUTH_PASSWORD_RESET' THEN
-          RAISE EXCEPTION 'forced audit failure';
-        END IF;
-        RETURN NEW;
-      END;
-      $$ LANGUAGE plpgsql;
-      CREATE TRIGGER fail_auth_reset_audit_trigger
-      BEFORE INSERT ON audit_logs
-      FOR EACH ROW EXECUTE FUNCTION fail_auth_reset_audit();
-    `);
-    try {
-      const failed = await adminAgent
-        .post(`/api/v1/users/${staffId}/reset-password`)
-        .set('x-csrf-token', login.body.data.csrfToken as string)
-        .expect(500);
-      expect(failed.body.error.code).toBe('INTERNAL_ERROR');
-      const after = await prisma.user.findUniqueOrThrow({
-        where: { id: staffId },
-        select: { passwordHash: true, mustChangePassword: true },
-      });
-      expect(after.passwordHash).toBe(before.passwordHash);
-      expect(after.mustChangePassword).toBe(false);
-      await staffAgent.get('/api/v1/auth/me').expect(200);
-    } finally {
-      await prisma.$executeRawUnsafe(
-        'DROP TRIGGER IF EXISTS fail_auth_reset_audit_trigger ON audit_logs; DROP FUNCTION IF EXISTS fail_auth_reset_audit();',
-      );
-    }
   });
 
   it('membatasi percobaan login berulang', async () => {

@@ -37,11 +37,6 @@ const environmentSchema = Joi.object({
     .min(3600)
     .max(604800)
     .default(43200),
-  TEMP_PASSWORD_TTL_SECONDS: Joi.number()
-    .integer()
-    .min(900)
-    .max(604800)
-    .default(86400),
 }).unknown(true);
 
 export function validateEnvironment(

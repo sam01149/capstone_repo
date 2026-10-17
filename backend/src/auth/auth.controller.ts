@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
-import { AllowPasswordChange, Public } from '../common/auth/auth.decorators.js';
+import { Public } from '../common/auth/auth.decorators.js';
 import { CSRF_COOKIE, REFRESH_COOKIE } from '../common/auth/auth.constants.js';
 import type {
   AuthenticatedRequest,
@@ -89,7 +89,6 @@ export class AuthController {
     return { loggedOut: true };
   }
 
-  @AllowPasswordChange()
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
   async changePassword(
@@ -109,6 +108,7 @@ export class AuthController {
       email: principal.email,
       role: principal.role,
       mustChangePassword: principal.mustChangePassword,
+      passwordChangedAt: principal.passwordChangedAt,
     };
   }
 }

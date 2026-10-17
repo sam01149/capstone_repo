@@ -8,7 +8,6 @@ import { Reflector } from '@nestjs/core';
 import { timingSafeEqual } from 'node:crypto';
 import {
   ACCESS_COOKIE,
-  ALLOW_PASSWORD_CHANGE_KEY,
   CSRF_COOKIE,
   IS_PUBLIC_KEY,
   ROLE_CODES,
@@ -65,14 +64,6 @@ export class AuthGuard implements CanActivate {
     ) {
       throw this.unauthorized();
     }
-    if (
-      session.user.mustChangePassword &&
-      session.user.temporaryPasswordExpiresAt &&
-      session.user.temporaryPasswordExpiresAt <= now
-    ) {
-      throw this.unauthorized();
-    }
-
     if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
       const csrfCookie = this.readCookie(request.cookies, CSRF_COOKIE);
       const csrfHeader = request.header('x-csrf-token');
@@ -102,19 +93,8 @@ export class AuthGuard implements CanActivate {
       email: session.user.email,
       role,
       mustChangePassword: session.user.mustChangePassword,
+      passwordChangedAt: session.user.passwordChangedAt.toISOString(),
     };
-
-    const allowPasswordChange = this.reflector.getAllAndOverride<boolean>(
-      ALLOW_PASSWORD_CHANGE_KEY,
-      [context.getHandler(), context.getClass()],
-    );
-    if (request.auth.mustChangePassword && !allowPasswordChange) {
-      throw new ApiError(
-        HttpStatus.FORBIDDEN,
-        'PASSWORD_CHANGE_REQUIRED',
-        'Password harus diganti sebelum mengakses fitur lain.',
-      );
-    }
 
     const roles = this.reflector.getAllAndOverride<RoleCode[]>(ROLES_KEY, [
       context.getHandler(),

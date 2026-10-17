@@ -8,6 +8,7 @@ export interface AuthPrincipal {
   email: string;
   role: RoleCode;
   mustChangePassword: boolean;
+  passwordChangedAt: string;
 }
 
 export interface AuthenticatedRequest extends Request {

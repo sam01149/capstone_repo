@@ -14,12 +14,4 @@ describe('PasswordService', () => {
     await expect(service.verify(hash, 'PasswordAman123')).resolves.toBe(true);
     await expect(service.verify(hash, 'salah')).resolves.toBe(false);
   });
-
-  it('membuat password sementara acak sepanjang 16 karakter', () => {
-    const first = service.generateTemporaryPassword();
-    const second = service.generateTemporaryPassword();
-    expect(first).toHaveLength(16);
-    expect(second).toHaveLength(16);
-    expect(first).not.toBe(second);
-  });
 });

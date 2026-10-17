@@ -17,6 +17,7 @@ import { ResponseInterceptor } from './common/http/response.interceptor.js';
 import { validateEnvironment } from './config/environment.schema.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
+import { UsersModule } from './users/users.module.js';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { HealthModule } from './health/health.module.js';
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]),
     DatabaseModule,
     AuthModule,
+    UsersModule,
     HealthModule,
   ],
   providers: [

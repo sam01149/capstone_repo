@@ -26,4 +26,3 @@ process.env.SESSION_TOKEN_PEPPER = 'test-token-pepper-'.padEnd(32, 's');
 process.env.ACCESS_TOKEN_TTL_SECONDS = '900';
 process.env.SESSION_IDLE_TTL_SECONDS = '7200';
 process.env.SESSION_ABSOLUTE_TTL_SECONDS = '43200';
-process.env.TEMP_PASSWORD_TTL_SECONDS = '86400';
