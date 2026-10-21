@@ -1,6 +1,6 @@
 # FarmSight Backend
 
-Backend FarmSight menggunakan NestJS, Prisma ORM, dan PostgreSQL. Autentikasi/RBAC serta pengelolaan pengguna internal telah tersedia; frontend dan modul bisnis lain dikerjakan pada paket terpisah.
+Backend FarmSight menggunakan NestJS, Prisma ORM, dan PostgreSQL. Autentikasi/RBAC, pengelolaan pengguna internal, kategori, dan master produk telah tersedia; frontend serta modul bisnis lain dikerjakan pada paket terpisah.
 
 ## Stack yang dipin
 
@@ -124,7 +124,7 @@ Environment bersama atau production hanya menjalankan migration yang sudah ada:
 npm run db:migrate:deploy
 ```
 
-Migration pertama membuat `roles`, `users`, `sessions`, dan `audit_logs`. Migration `20261016090000_internal_users_password_policy` menghapus expiry password sementara dan menambah indeks activity pengguna. Karena role aplikasi tidak memiliki `CREATEDB`, development lokal dapat memakai migration SQL yang sudah direview melalui `db:migrate:deploy`; jangan menaikkan hak role hanya agar shadow database Prisma tersedia.
+Migration pertama membuat `roles`, `users`, `sessions`, dan `audit_logs`. Migration `20261016090000_internal_users_password_policy` menghapus expiry password sementara dan menambah indeks activity pengguna. Migration `20261021130000_product_catalog` menambahkan kategori dan master produk beserta constraint harga, parameter stok, URL gambar, keunikan, serta foreign key. Karena role aplikasi tidak memiliki `CREATEDB`, development lokal dapat memakai migration SQL yang sudah direview melalui `db:migrate:deploy`; jangan menaikkan hak role hanya agar shadow database Prisma tersedia.
 
 Super Admin pertama dibuat satu kali tanpa password default. Isi tiga environment sementara berikut dengan nilai nyata, jalankan command, lalu hapus environment prosesnya: `BOOTSTRAP_SUPER_ADMIN_NAME`, `BOOTSTRAP_SUPER_ADMIN_EMAIL`, dan `BOOTSTRAP_SUPER_ADMIN_PASSWORD`.
 
@@ -194,3 +194,17 @@ Endpoint pengguna berikut khusus Super Admin:
 Password baru pada create/reset/change wajib sepanjang 8–16 karakter. Reset menerima password dari Super Admin, mencabut sesi target, serta menetapkan `mustChangePassword=true` sebagai penanda saran non-blocking tanpa expiry. Backend tidak mengembalikan password dan tidak menyediakan endpoint untuk tombol X banner; tombol tersebut sepenuhnya dikelola frontend.
 
 Frontend harus memakai `credentials: 'include'` dan mengirim `X-CSRF-Token` pada mutation privat.
+
+## Endpoint kategori dan produk
+
+Ketiga role internal dapat memakai endpoint baca berikut:
+
+- `GET /api/v1/categories` dan `GET /api/v1/categories/:id`
+- `GET /api/v1/products` dan `GET /api/v1/products/:id`
+
+Endpoint mutation berikut khusus Super Admin dan memerlukan CSRF:
+
+- `POST /api/v1/categories`, `PATCH /api/v1/categories/:id`, `POST /api/v1/categories/:id/deactivate`
+- `POST /api/v1/products`, `PATCH /api/v1/products/:id`, `POST /api/v1/products/:id/deactivate`
+
+Harga disimpan sebagai integer rupiah positif. `minimumStock`, `leadTimeDays`, `safetyStock`, dan `reorderPoint` menerima integer nonnegatif. `imageRef` hanya URL HTTPS opsional; backend belum mengunggah atau mengompresi file gambar. Slug dibuat saat create dan tetap stabil ketika nama berubah.
