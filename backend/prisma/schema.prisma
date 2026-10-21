@@ -20,21 +20,21 @@ model Role {
 }
 
 model User {
-  id                         String     @id @default(uuid()) @db.Uuid
-  name                       String     @db.VarChar(120)
-  email                      String     @db.VarChar(254)
-  emailNormalized            String     @unique @map("email_normalized") @db.VarChar(254)
-  passwordHash               String     @map("password_hash") @db.VarChar(255)
-  roleId                     String     @map("role_id") @db.Uuid
-  isActive                   Boolean    @default(true) @map("is_active")
-  mustChangePassword         Boolean    @default(false) @map("must_change_password")
-  lastLoginAt                DateTime?  @map("last_login_at") @db.Timestamptz(6)
-  passwordChangedAt          DateTime   @default(now()) @map("password_changed_at") @db.Timestamptz(6)
-  createdAt                  DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt                  DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
-  role                       Role       @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  sessions                   Session[]
-  auditLogs                  AuditLog[] @relation("AuditActor")
+  id                 String     @id @default(uuid()) @db.Uuid
+  name               String     @db.VarChar(120)
+  email              String     @db.VarChar(254)
+  emailNormalized    String     @unique @map("email_normalized") @db.VarChar(254)
+  passwordHash       String     @map("password_hash") @db.VarChar(255)
+  roleId             String     @map("role_id") @db.Uuid
+  isActive           Boolean    @default(true) @map("is_active")
+  mustChangePassword Boolean    @default(false) @map("must_change_password")
+  lastLoginAt        DateTime?  @map("last_login_at") @db.Timestamptz(6)
+  passwordChangedAt  DateTime   @default(now()) @map("password_changed_at") @db.Timestamptz(6)
+  createdAt          DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  role               Role       @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  sessions           Session[]
+  auditLogs          AuditLog[] @relation("AuditActor")
 
   @@index([roleId])
   @@index([isActive])
@@ -76,4 +76,42 @@ model AuditLog {
   @@index([action, createdAt])
   @@index([targetType, targetId, createdAt])
   @@map("audit_logs")
+}
+
+model Category {
+  id             String    @id @default(uuid()) @db.Uuid
+  name           String    @db.VarChar(100)
+  nameNormalized String    @unique @map("name_normalized") @db.VarChar(100)
+  slug           String    @unique @db.VarChar(120)
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  products       Product[]
+
+  @@index([isActive])
+  @@map("categories")
+}
+
+model Product {
+  id            String   @id @default(uuid()) @db.Uuid
+  sku           String   @db.VarChar(64)
+  skuNormalized String   @unique @map("sku_normalized") @db.VarChar(64)
+  name          String   @db.VarChar(160)
+  slug          String   @unique @db.VarChar(180)
+  description   String?  @db.VarChar(1000)
+  categoryId    String   @map("category_id") @db.Uuid
+  price         Int
+  imageRef      String?  @map("image_ref") @db.VarChar(2048)
+  isActive      Boolean  @default(true) @map("is_active")
+  minimumStock  Int      @default(0) @map("minimum_stock")
+  leadTimeDays  Int      @default(0) @map("lead_time_days")
+  safetyStock   Int      @default(0) @map("safety_stock")
+  reorderPoint  Int      @default(0) @map("reorder_point")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  category      Category @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([categoryId, isActive])
+  @@index([isActive])
+  @@map("products")
 }

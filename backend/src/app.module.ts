@@ -9,6 +9,7 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthGuard } from './auth/auth.guard.js';
 import { AuthModule } from './auth/auth.module.js';
+import { CategoriesModule } from './categories/categories.module.js';
 import { ApiExceptionFilter } from './common/http/api-exception.filter.js';
 import { SafeLoggingInterceptor } from './common/http/logging.interceptor.js';
 import { OriginMiddleware } from './common/http/origin.middleware.js';
@@ -17,6 +18,7 @@ import { ResponseInterceptor } from './common/http/response.interceptor.js';
 import { validateEnvironment } from './config/environment.schema.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
+import { ProductsModule } from './products/products.module.js';
 import { UsersModule } from './users/users.module.js';
 
 @Module({
@@ -30,6 +32,8 @@ import { UsersModule } from './users/users.module.js';
     DatabaseModule,
     AuthModule,
     UsersModule,
+    CategoriesModule,
+    ProductsModule,
     HealthModule,
   ],
   providers: [
