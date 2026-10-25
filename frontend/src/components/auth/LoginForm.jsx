@@ -61,7 +61,7 @@ export default function LoginForm({ onBackToCatalog, onLoginSuccess }) {
         fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
       }}
     >
-      {/* Top Bar with Brand */}
+      {/* Top Left Navigation: Kembali ke Katalog */}
       <header
         style={{
           height: '72px',
@@ -70,30 +70,41 @@ export default function LoginForm({ onBackToCatalog, onLoginSuccess }) {
           alignItems: 'center',
         }}
       >
-        {/* Brand Left */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <img
-            src="/images/logo-farm-berkah.jpg"
-            alt="Logo Toko Farm Berkah"
+        {onBackToCatalog && (
+          <button
+            type="button"
+            onClick={onBackToCatalog}
+            id="btn-back-to-catalog"
             style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '50%',
-              objectFit: 'cover',
-              border: '1px solid #d8e2da',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 14px',
+              borderRadius: '10px',
+              border: '1px solid #e2e8f0',
+              backgroundColor: '#ffffff',
+              color: '#475569',
+              fontSize: '0.85rem',
+              fontWeight: 500,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
             }}
-          />
-          <span
-            style={{
-              fontSize: '1.15rem',
-              fontWeight: 800,
-              color: '#111827',
-              letterSpacing: '-0.02em',
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f8fafc';
+              e.currentTarget.style.borderColor = '#cbd5e1';
+              e.currentTarget.style.color = '#0f172a';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#ffffff';
+              e.currentTarget.style.borderColor = '#e2e8f0';
+              e.currentTarget.style.color = '#475569';
             }}
           >
-            Toko Farm Berkah
-          </span>
-        </div>
+            <ArrowLeft size={16} />
+            <span>Kembali ke Katalog</span>
+          </button>
+        )}
       </header>
 
       {/* Main Centered Login Card (Dribbble Minimalist Style) */}
@@ -301,45 +312,16 @@ export default function LoginForm({ onBackToCatalog, onLoginSuccess }) {
             </button>
           </form>
 
-          {/* Action Links: Kembali ke Katalog & Lupa kata sandi */}
+          {/* Action Link: Lupa kata sandi */}
           <div
             style={{
               marginTop: '22px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '12px',
               fontSize: '0.825rem',
             }}
           >
-            {onBackToCatalog && (
-              <>
-                <button
-                  type="button"
-                  onClick={onBackToCatalog}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    fontSize: '0.825rem',
-                    fontWeight: 500,
-                    color: '#64748b',
-                    cursor: 'pointer',
-                    padding: 0,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    transition: 'color 0.2s',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = '#0f172a')}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = '#64748b')}
-                >
-                  <ArrowLeft size={14} />
-                  <span>Kembali ke Katalog</span>
-                </button>
-                <span style={{ color: '#cbd5e1' }}>•</span>
-              </>
-            )}
-
             <button
               type="button"
               onClick={() => setIsForgotOpen(true)}

@@ -107,40 +107,6 @@ export default function ForgotPassword({ isOpen, onClose, onOpenLoginWithEmail }
       }}
       className="animate-fade-in"
     >
-      {/* 1. TOP HEADER */}
-      <header
-        style={{
-          height: '72px',
-          padding: '0 40px',
-          display: 'flex',
-          alignItems: 'center',
-        }}
-      >
-        {/* Brand Left */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <img
-            src="/images/logo-farm-berkah.jpg"
-            alt="Logo Toko Farm Berkah"
-            style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '50%',
-              objectFit: 'cover',
-              border: '1px solid #d8e2da',
-            }}
-          />
-          <span
-            style={{
-              fontSize: '1.15rem',
-              fontWeight: 800,
-              color: '#111827',
-              letterSpacing: '-0.02em',
-            }}
-          >
-            Toko Farm Berkah
-          </span>
-        </div>
-      </header>
 
       {/* 2. MAIN CENTERED CONTENT (FULL-SCREEN EXPERIENCE) */}
       <main
