@@ -1,0 +1,43 @@
+# Dependencies and build
+node_modules/
+dist/
+coverage/
+.nyc_output/
+
+# Environment and secrets
+.env
+.env.*
+.env.example
+*.pem
+*.key
+
+# Logs and runtime data
+logs/
+*.log
+tmp/
+temp/
+uploads/
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Databases and exports
+*.sqlite
+*.db
+*.dump
+*.sql.gz
+exports/
+
+# Local-only project guidance and workspace files
+.claude/
+*.md
+!/README.md
+!/backend/README.md
+/.agents/
+/Dokumentasi/
+/.github/
+/.gitattributes
+/scripts/
