@@ -1,6 +1,6 @@
 # FarmSight Backend
 
-Backend FarmSight menggunakan NestJS, Prisma ORM, dan PostgreSQL. Autentikasi/RBAC, pengelolaan pengguna internal, kategori, dan master produk telah tersedia; frontend serta modul bisnis lain dikerjakan pada paket terpisah.
+Backend FarmSight menggunakan NestJS, Prisma ORM, dan PostgreSQL. Autentikasi/RBAC, pengguna internal, kategori/master produk, serta inventory dan stock movement manual telah tersedia; frontend serta modul bisnis lain dikerjakan pada paket terpisah.
 
 ## Stack yang dipin
 
@@ -124,7 +124,7 @@ Environment bersama atau production hanya menjalankan migration yang sudah ada:
 npm run db:migrate:deploy
 ```
 
-Migration pertama membuat `roles`, `users`, `sessions`, dan `audit_logs`. Migration `20261016090000_internal_users_password_policy` menghapus expiry password sementara dan menambah indeks activity pengguna. Migration `20261021130000_product_catalog` menambahkan kategori dan master produk beserta constraint harga, parameter stok, URL gambar, keunikan, serta foreign key. Karena role aplikasi tidak memiliki `CREATEDB`, development lokal dapat memakai migration SQL yang sudah direview melalui `db:migrate:deploy`; jangan menaikkan hak role hanya agar shadow database Prisma tersedia.
+Migration pertama membuat `roles`, `users`, `sessions`, dan `audit_logs`. Migration `20261016090000_internal_users_password_policy` menghapus expiry password sementara dan menambah indeks activity pengguna. Migration `20261021130000_product_catalog` menambahkan kategori/master produk. Migration `20261025190000_inventory_stock_movement` serta forward-fix `20261025200000_inventory_policy_constraints` menambahkan decimal, satuan, saldo, ledger, idempotency, dan constraint inventory. Karena role aplikasi tidak memiliki `CREATEDB`, development lokal dapat memakai migration SQL yang sudah direview melalui `db:migrate:deploy`; jangan menaikkan hak role hanya agar shadow database Prisma tersedia.
 
 Super Admin pertama dibuat satu kali tanpa password default. Isi tiga environment sementara berikut dengan nilai nyata, jalankan command, lalu hapus environment prosesnya: `BOOTSTRAP_SUPER_ADMIN_NAME`, `BOOTSTRAP_SUPER_ADMIN_EMAIL`, dan `BOOTSTRAP_SUPER_ADMIN_PASSWORD`.
 
@@ -145,6 +145,7 @@ E2E otomatis menurunkan target `farmsight_test` dari URL lokal `farmsight_dev`, 
 
 ```powershell
 npm run db:migrate:test
+npm run db:migrate:test:empty
 npm run test:e2e
 ```
 
@@ -207,4 +208,14 @@ Endpoint mutation berikut khusus Super Admin dan memerlukan CSRF:
 - `POST /api/v1/categories`, `PATCH /api/v1/categories/:id`, `POST /api/v1/categories/:id/deactivate`
 - `POST /api/v1/products`, `PATCH /api/v1/products/:id`, `POST /api/v1/products/:id/deactivate`
 
-Harga disimpan sebagai integer rupiah positif. `minimumStock`, `leadTimeDays`, `safetyStock`, dan `reorderPoint` menerima integer nonnegatif. `imageRef` hanya URL HTTPS opsional; backend belum mengunggah atau mengompresi file gambar. Slug dibuat saat create dan tetap stabil ketika nama berubah.
+Harga disimpan sebagai integer rupiah positif. `minimumStock`, `safetyStock`, dan `reorderPoint` menerima decimal string nonnegatif maksimal tiga digit pecahan; `leadTimeDays` tetap integer. Produk memiliki `stockUnit`; satuan terkunci setelah saldo atau histori digunakan. `imageRef` hanya URL HTTPS opsional; backend belum mengunggah atau mengompresi file gambar. Slug dibuat saat create dan tetap stabil ketika nama berubah.
+
+## Endpoint inventory
+
+Ketiga role internal dapat membaca:
+
+- `GET /api/v1/inventory`
+- `GET /api/v1/inventory/:productId`
+- `GET /api/v1/inventory/movements`
+
+Super Admin dan Stock Manager dapat membuat movement manual melalui `POST /api/v1/inventory/movements`. Request memerlukan CSRF dan header `Idempotency-Key` UUID v4. Kuantitas dikirim sebagai decimal string; adjustment mengirim hasil hitung fisik. Sales Admin hanya membaca pada tahap ini. Integrasi pengurangan stok oleh konfirmasi pesanan belum termasuk.
