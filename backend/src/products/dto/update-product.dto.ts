@@ -2,6 +2,8 @@ import { Transform, Type } from 'class-transformer';
 import {
   IsInt,
   IsOptional,
+  IsIn,
+  Matches,
   IsString,
   IsUrl,
   IsUUID,
@@ -11,6 +13,11 @@ import {
   MinLength,
   ValidateIf,
 } from 'class-validator';
+import {
+  DECIMAL_QUANTITY_PATTERN,
+  STOCK_UNITS,
+  type StockUnit,
+} from '../../inventory/inventory.constants.js';
 
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : value;
@@ -69,11 +76,9 @@ export class UpdateProductDto {
   imageRef?: string | null;
 
   @ValidateIf((_object, value) => value !== undefined)
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(1_000_000_000)
-  minimumStock?: number;
+  @IsString()
+  @Matches(DECIMAL_QUANTITY_PATTERN)
+  minimumStock?: string;
 
   @ValidateIf((_object, value) => value !== undefined)
   @Type(() => Number)
@@ -83,16 +88,16 @@ export class UpdateProductDto {
   leadTimeDays?: number;
 
   @ValidateIf((_object, value) => value !== undefined)
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(1_000_000_000)
-  safetyStock?: number;
+  @IsString()
+  @Matches(DECIMAL_QUANTITY_PATTERN)
+  safetyStock?: string;
 
   @ValidateIf((_object, value) => value !== undefined)
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  @Max(1_000_000_000)
-  reorderPoint?: number;
+  @IsString()
+  @Matches(DECIMAL_QUANTITY_PATTERN)
+  reorderPoint?: string;
+
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsIn(STOCK_UNITS)
+  stockUnit?: StockUnit;
 }

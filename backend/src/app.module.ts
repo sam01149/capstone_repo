@@ -18,6 +18,7 @@ import { ResponseInterceptor } from './common/http/response.interceptor.js';
 import { validateEnvironment } from './config/environment.schema.js';
 import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
+import { InventoryModule } from './inventory/inventory.module.js';
 import { ProductsModule } from './products/products.module.js';
 import { UsersModule } from './users/users.module.js';
 
@@ -34,6 +35,7 @@ import { UsersModule } from './users/users.module.js';
     UsersModule,
     CategoriesModule,
     ProductsModule,
+    InventoryModule,
     HealthModule,
   ],
   providers: [

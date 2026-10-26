@@ -29,6 +29,8 @@ describe('FarmSight product catalog API (e2e)', () => {
     await prisma.$executeRawUnsafe(
       'DROP TRIGGER IF EXISTS fail_catalog_audit_trigger ON audit_logs; DROP FUNCTION IF EXISTS fail_catalog_audit();',
     );
+    await prisma.stockMovement.deleteMany();
+    await prisma.inventoryBalance.deleteMany();
     await prisma.product.deleteMany();
     await prisma.category.deleteMany();
     await prisma.auditLog.deleteMany();
@@ -94,10 +96,11 @@ describe('FarmSight product catalog API (e2e)', () => {
       categoryId,
       price: 125000,
       imageRef: 'https://images.example.test/npk.jpg',
-      minimumStock: 10,
+      minimumStock: '10',
       leadTimeDays: 7,
-      safetyStock: 5,
-      reorderPoint: 15,
+      safetyStock: '5',
+      reorderPoint: '15',
+      stockUnit: 'KG',
       ...overrides,
     };
   }
@@ -223,7 +226,7 @@ describe('FarmSight product catalog API (e2e)', () => {
     await admin.agent
       .post('/api/v1/products')
       .set('x-csrf-token', admin.csrf)
-      .send(productPayload(categoryId, { minimumStock: -1 }))
+      .send(productPayload(categoryId, { minimumStock: '-1' }))
       .expect(400);
     await admin.agent
       .post('/api/v1/products')
@@ -255,10 +258,12 @@ describe('FarmSight product catalog API (e2e)', () => {
       sku: 'NPK-001',
       slug: 'pupuk-npk-mutiara',
       imageRef: 'https://images.example.test/npk.jpg',
-      minimumStock: 10,
+      minimumStock: '10.000',
       leadTimeDays: 7,
-      safetyStock: 5,
-      reorderPoint: 15,
+      safetyStock: '5.000',
+      reorderPoint: '15.000',
+      stockUnit: 'KG',
+      stockUnitLabel: 'Kilogram',
       category: { id: categoryId, name: 'Nutrisi Tanaman' },
     });
     const duplicateSku = await admin.agent
@@ -295,16 +300,16 @@ describe('FarmSight product catalog API (e2e)', () => {
       .send({
         name: 'Pupuk NPK Premium',
         imageRef: 'https://cdn.example.test/npk-new.webp',
-        safetyStock: 8,
-        reorderPoint: 20,
+        safetyStock: '8',
+        reorderPoint: '20',
       })
       .expect(200);
     expect(updated.body.data).toMatchObject({
       name: 'Pupuk NPK Premium',
       slug: 'pupuk-npk-mutiara',
       imageRef: 'https://cdn.example.test/npk-new.webp',
-      safetyStock: 8,
-      reorderPoint: 20,
+      safetyStock: '8.000',
+      reorderPoint: '20.000',
     });
     const cleared = await admin.agent
       .patch(`/api/v1/products/${productId}`)
@@ -527,6 +532,8 @@ describe('FarmSight product catalog API (e2e)', () => {
     await prisma.$executeRawUnsafe(
       'DROP TRIGGER IF EXISTS fail_catalog_audit_trigger ON audit_logs; DROP FUNCTION IF EXISTS fail_catalog_audit();',
     );
+    await prisma.stockMovement.deleteMany();
+    await prisma.inventoryBalance.deleteMany();
     await prisma.product.deleteMany();
     await prisma.category.deleteMany();
     await app.close();
