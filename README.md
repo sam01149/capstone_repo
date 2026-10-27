@@ -15,4 +15,4 @@ Tanggung jawab tidak membatasi kolaborasi, tetapi setiap perubahan tetap harus m
 
 ## Status implementasi
 
-Source backend berada di `backend/`. Fondasi API, autentikasi, sesi, CSRF, RBAC tiga role, pengguna internal, kategori/master produk, serta inventory dan stock movement manual sudah tersedia. Saldo memakai decimal presisi tetap, movement idempotent/atomik, dan Sales Admin memiliki akses baca inventory. Order, pengurangan stok melalui konfirmasi pesanan, serta frontend belum termasuk perubahan ini. Instruksi menjalankan aplikasi dan membuat Super Admin pertama terdapat di `backend/README.md`.
+Source backend berada di `backend/`. Fondasi API, autentikasi, sesi, CSRF, RBAC tiga role, pengguna internal, kategori/master produk, inventory, katalog publik, draft WhatsApp, serta pesanan sudah tersedia. Konfirmasi pesanan mengurangi stok dan mencatat movement penjualan secara atomik tanpa reservasi. Frontend, pembayaran online, bukti transfer, dan pengiriman otomatis tidak termasuk. Instruksi menjalankan aplikasi dan membuat Super Admin pertama terdapat di `backend/README.md`.

@@ -61,4 +61,19 @@ describe('validateEnvironment', () => {
       }),
     ).toThrow('COOKIE_SECURE wajib true');
   });
+
+  it('menerima nomor WhatsApp internasional dan menolak format tidak aman', () => {
+    expect(
+      validateEnvironment({
+        ...required,
+        WHATSAPP_BUSINESS_NUMBER: '6281234567890',
+      }).WHATSAPP_BUSINESS_NUMBER,
+    ).toBe('6281234567890');
+    expect(() =>
+      validateEnvironment({
+        ...required,
+        WHATSAPP_BUSINESS_NUMBER: '+62 812-3456-7890',
+      }),
+    ).toThrow('Konfigurasi environment tidak valid');
+  });
 });

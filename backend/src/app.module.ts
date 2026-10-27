@@ -20,6 +20,8 @@ import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
 import { InventoryModule } from './inventory/inventory.module.js';
 import { ProductsModule } from './products/products.module.js';
+import { OrdersModule } from './orders/orders.module.js';
+import { PublicCatalogModule } from './public-catalog/public-catalog.module.js';
 import { UsersModule } from './users/users.module.js';
 
 @Module({
@@ -36,6 +38,8 @@ import { UsersModule } from './users/users.module.js';
     CategoriesModule,
     ProductsModule,
     InventoryModule,
+    OrdersModule,
+    PublicCatalogModule,
     HealthModule,
   ],
   providers: [

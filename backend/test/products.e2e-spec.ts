@@ -29,7 +29,10 @@ describe('FarmSight product catalog API (e2e)', () => {
     await prisma.$executeRawUnsafe(
       'DROP TRIGGER IF EXISTS fail_catalog_audit_trigger ON audit_logs; DROP FUNCTION IF EXISTS fail_catalog_audit();',
     );
+    await prisma.orderMutation.deleteMany();
     await prisma.stockMovement.deleteMany();
+    await prisma.orderItem.deleteMany();
+    await prisma.order.deleteMany();
     await prisma.inventoryBalance.deleteMany();
     await prisma.product.deleteMany();
     await prisma.category.deleteMany();
@@ -532,7 +535,10 @@ describe('FarmSight product catalog API (e2e)', () => {
     await prisma.$executeRawUnsafe(
       'DROP TRIGGER IF EXISTS fail_catalog_audit_trigger ON audit_logs; DROP FUNCTION IF EXISTS fail_catalog_audit();',
     );
+    await prisma.orderMutation.deleteMany();
     await prisma.stockMovement.deleteMany();
+    await prisma.orderItem.deleteMany();
+    await prisma.order.deleteMany();
     await prisma.inventoryBalance.deleteMany();
     await prisma.product.deleteMany();
     await prisma.category.deleteMany();
