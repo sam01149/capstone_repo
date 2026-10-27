@@ -37,6 +37,9 @@ const environmentSchema = Joi.object({
     .min(3600)
     .max(604800)
     .default(43200),
+  WHATSAPP_BUSINESS_NUMBER: Joi.string()
+    .pattern(/^\d{8,15}$/)
+    .optional(),
 }).unknown(true);
 
 export function validateEnvironment(

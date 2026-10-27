@@ -26,3 +26,4 @@ process.env.SESSION_TOKEN_PEPPER = 'test-token-pepper-'.padEnd(32, 's');
 process.env.ACCESS_TOKEN_TTL_SECONDS = '900';
 process.env.SESSION_IDLE_TTL_SECONDS = '7200';
 process.env.SESSION_ABSOLUTE_TTL_SECONDS = '43200';
+process.env.WHATSAPP_BUSINESS_NUMBER = '6281234567890';

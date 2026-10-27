@@ -30,7 +30,10 @@ describe('FarmSight inventory API (e2e)', () => {
     await prisma.$executeRawUnsafe(
       'DROP TRIGGER IF EXISTS fail_inventory_audit_trigger ON audit_logs; DROP FUNCTION IF EXISTS fail_inventory_audit(); DROP TRIGGER IF EXISTS fail_inventory_balance_trigger ON inventory_balances; DROP FUNCTION IF EXISTS fail_inventory_balance(); DROP TRIGGER IF EXISTS fail_stock_movement_trigger ON stock_movements; DROP FUNCTION IF EXISTS fail_stock_movement();',
     );
+    await prisma.orderMutation.deleteMany();
     await prisma.stockMovement.deleteMany();
+    await prisma.orderItem.deleteMany();
+    await prisma.order.deleteMany();
     await prisma.inventoryBalance.deleteMany();
     await prisma.product.deleteMany();
     await prisma.category.deleteMany();

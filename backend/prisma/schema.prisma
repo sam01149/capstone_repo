@@ -36,6 +36,9 @@ model User {
   sessions           Session[]
   auditLogs          AuditLog[]      @relation("AuditActor")
   stockMovements     StockMovement[] @relation("StockMovementActor")
+  createdOrders      Order[]         @relation("OrderCreator")
+  confirmedOrders    Order[]         @relation("OrderConfirmer")
+  orderMutations     OrderMutation[]
 
   @@index([roleId])
   @@index([isActive])
@@ -114,6 +117,7 @@ model Product {
   category         Category          @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   inventoryBalance InventoryBalance?
   stockMovements   StockMovement[]
+  orderItems       OrderItem[]
 
   @@index([categoryId, isActive])
   @@index([isActive])
@@ -132,28 +136,98 @@ model InventoryBalance {
 }
 
 model StockMovement {
-  id             String   @id @default(uuid()) @db.Uuid
-  productId      String   @map("product_id") @db.Uuid
-  type           String   @db.VarChar(30)
-  action         String   @db.VarChar(40)
-  quantity       Decimal  @db.Decimal(15, 3)
-  stockBefore    Decimal  @map("stock_before") @db.Decimal(15, 3)
-  stockAfter     Decimal  @map("stock_after") @db.Decimal(15, 3)
-  reasonCode     String   @map("reason_code") @db.VarChar(40)
-  note           String?  @db.VarChar(1000)
-  referenceType  String?  @map("reference_type") @db.VarChar(40)
-  referenceId    String?  @map("reference_id") @db.VarChar(100)
-  idempotencyKey String   @map("idempotency_key") @db.Uuid
-  payloadHash    String   @map("payload_hash") @db.Char(64)
-  actorUserId    String   @map("actor_user_id") @db.Uuid
-  occurredAt     DateTime @map("occurred_at") @db.Timestamptz(6)
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  product        Product  @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  actor          User     @relation("StockMovementActor", fields: [actorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  id             String     @id @default(uuid()) @db.Uuid
+  productId      String     @map("product_id") @db.Uuid
+  type           String     @db.VarChar(30)
+  action         String     @db.VarChar(40)
+  quantity       Decimal    @db.Decimal(15, 3)
+  stockBefore    Decimal    @map("stock_before") @db.Decimal(15, 3)
+  stockAfter     Decimal    @map("stock_after") @db.Decimal(15, 3)
+  reasonCode     String     @map("reason_code") @db.VarChar(40)
+  note           String?    @db.VarChar(1000)
+  referenceType  String?    @map("reference_type") @db.VarChar(40)
+  referenceId    String?    @map("reference_id") @db.VarChar(100)
+  idempotencyKey String     @map("idempotency_key") @db.Uuid
+  payloadHash    String     @map("payload_hash") @db.Char(64)
+  actorUserId    String     @map("actor_user_id") @db.Uuid
+  occurredAt     DateTime   @map("occurred_at") @db.Timestamptz(6)
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  product        Product    @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  actor          User       @relation("StockMovementActor", fields: [actorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  orderItemId    String?    @unique @map("order_item_id") @db.Uuid
+  orderItem      OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@unique([actorUserId, idempotencyKey])
   @@index([productId, occurredAt, id])
   @@index([type, occurredAt])
   @@index([actorUserId, occurredAt])
   @@map("stock_movements")
+}
+
+model Order {
+  id                String          @id @default(uuid()) @db.Uuid
+  publicCode        String          @unique @map("public_code") @db.VarChar(16)
+  source            String          @db.VarChar(24)
+  status            String          @db.VarChar(32)
+  customerName      String?         @map("customer_name") @db.VarChar(120)
+  customerPhone     String?         @map("customer_phone") @db.VarChar(32)
+  customerEmail     String?         @map("customer_email") @db.VarChar(254)
+  customerAddress   String?         @map("customer_address") @db.VarChar(500)
+  currency          String          @default("IDR") @db.Char(3)
+  totalAmount       Int             @map("total_amount")
+  createdByUserId   String?         @map("created_by_user_id") @db.Uuid
+  confirmedByUserId String?         @map("confirmed_by_user_id") @db.Uuid
+  expiresAt         DateTime?       @map("expires_at") @db.Timestamptz(6)
+  confirmedAt       DateTime?       @map("confirmed_at") @db.Timestamptz(6)
+  completedAt       DateTime?       @map("completed_at") @db.Timestamptz(6)
+  cancelledAt       DateTime?       @map("cancelled_at") @db.Timestamptz(6)
+  anonymizedAt      DateTime?       @map("anonymized_at") @db.Timestamptz(6)
+  version           Int             @default(0)
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdBy         User?           @relation("OrderCreator", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  confirmedBy       User?           @relation("OrderConfirmer", fields: [confirmedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  items             OrderItem[]
+  mutations         OrderMutation[]
+
+  @@index([status, createdAt])
+  @@index([source, createdAt])
+  @@index([expiresAt])
+  @@index([completedAt])
+  @@index([cancelledAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id             String         @id @default(uuid()) @db.Uuid
+  orderId        String         @map("order_id") @db.Uuid
+  productId      String         @map("product_id") @db.Uuid
+  snapshotSku    String         @map("snapshot_sku") @db.VarChar(64)
+  snapshotName   String         @map("snapshot_name") @db.VarChar(160)
+  snapshotUnit   String         @map("snapshot_unit") @db.VarChar(20)
+  unitPrice      Int            @map("unit_price")
+  quantity       Decimal        @db.Decimal(15, 3)
+  subtotalAmount Int            @map("subtotal_amount")
+  order          Order          @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  product        Product        @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  stockMovement  StockMovement?
+
+  @@unique([orderId, productId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+model OrderMutation {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique @db.Uuid
+  kind        String   @db.VarChar(32)
+  requestHash String   @map("request_hash") @db.Char(64)
+  orderId     String   @map("order_id") @db.Uuid
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  actor       User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("order_mutations")
 }

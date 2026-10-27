@@ -1,6 +1,6 @@
 # FarmSight Backend
 
-Backend FarmSight menggunakan NestJS, Prisma ORM, dan PostgreSQL. Autentikasi/RBAC, pengguna internal, kategori/master produk, serta inventory dan stock movement manual telah tersedia; frontend serta modul bisnis lain dikerjakan pada paket terpisah.
+Backend FarmSight menggunakan NestJS, Prisma ORM, dan PostgreSQL. Autentikasi/RBAC, pengguna internal, kategori/master produk, inventory, katalog publik, draft WhatsApp, pesanan, serta integrasi movement penjualan telah tersedia; frontend serta modul bisnis lain dikerjakan pada paket terpisah.
 
 ## Stack yang dipin
 
@@ -100,6 +100,7 @@ DATABASE_CONNECT_TIMEOUT_MS=5000
 DATABASE_SSL=false
 FRONTEND_ORIGIN=http://localhost:5173
 COOKIE_SECURE=false
+WHATSAPP_BUSINESS_NUMBER=6281234567890
 ```
 
 `env:init:local` melengkapi JWT secret dan pepper acak hanya di dalam `.env`. Karakter khusus pada username atau password database wajib di-URL-encode.
@@ -124,7 +125,7 @@ Environment bersama atau production hanya menjalankan migration yang sudah ada:
 npm run db:migrate:deploy
 ```
 
-Migration pertama membuat `roles`, `users`, `sessions`, dan `audit_logs`. Migration `20261016090000_internal_users_password_policy` menghapus expiry password sementara dan menambah indeks activity pengguna. Migration `20261021130000_product_catalog` menambahkan kategori/master produk. Migration `20261025190000_inventory_stock_movement` serta forward-fix `20261025200000_inventory_policy_constraints` menambahkan decimal, satuan, saldo, ledger, idempotency, dan constraint inventory. Karena role aplikasi tidak memiliki `CREATEDB`, development lokal dapat memakai migration SQL yang sudah direview melalui `db:migrate:deploy`; jangan menaikkan hak role hanya agar shadow database Prisma tersedia.
+Migration pertama membuat `roles`, `users`, `sessions`, dan `audit_logs`. Migration `20261016090000_internal_users_password_policy` memperbarui kebijakan pengguna. Migration `20261021130000_product_catalog` menambahkan kategori/master produk. Dua migration 2026-10-25 menambahkan saldo dan ledger inventory. Migration `20261027120000_orders_whatsapp_stock_integration` serta forward-fix `20261027123000_order_state_constraints` menambahkan order, snapshot item, idempotensi, relasi movement penjualan, dan constraint state. Karena role aplikasi tidak memiliki `CREATEDB`, development lokal dapat memakai migration SQL yang sudah direview melalui `db:migrate:deploy`; jangan menaikkan hak role hanya agar shadow database Prisma tersedia.
 
 Super Admin pertama dibuat satu kali tanpa password default. Isi tiga environment sementara berikut dengan nilai nyata, jalankan command, lalu hapus environment prosesnya: `BOOTSTRAP_SUPER_ADMIN_NAME`, `BOOTSTRAP_SUPER_ADMIN_EMAIL`, dan `BOOTSTRAP_SUPER_ADMIN_PASSWORD`.
 
@@ -218,4 +219,24 @@ Ketiga role internal dapat membaca:
 - `GET /api/v1/inventory/:productId`
 - `GET /api/v1/inventory/movements`
 
-Super Admin dan Stock Manager dapat membuat movement manual melalui `POST /api/v1/inventory/movements`. Request memerlukan CSRF dan header `Idempotency-Key` UUID v4. Kuantitas dikirim sebagai decimal string; adjustment mengirim hasil hitung fisik. Sales Admin hanya membaca pada tahap ini. Integrasi pengurangan stok oleh konfirmasi pesanan belum termasuk.
+Super Admin dan Stock Manager dapat membuat movement manual melalui `POST /api/v1/inventory/movements`. Request memerlukan CSRF dan header `Idempotency-Key` UUID v4. Kuantitas dikirim sebagai decimal string; adjustment mengirim hasil hitung fisik. Sales Admin hanya membaca endpoint movement manual; movement `SALE_OUT` hanya dibuat oleh konfirmasi pesanan.
+
+## Endpoint katalog publik dan pesanan
+
+Endpoint tanpa login:
+
+- `GET /api/v1/public/products`
+- `GET /api/v1/public/products/:slug`
+- `POST /api/v1/public/order-drafts`
+
+Draft publik memerlukan nama, nomor telepon, minimal satu item, serta header `Idempotency-Key` UUID v4. Backend menghitung harga/total dari database dan mengembalikan ringkasan beserta URL WhatsApp dari `WHATSAPP_BUSINESS_NUMBER`. Pelanggan tetap menekan Kirim di WhatsApp; backend tidak mengirim pesan atau memproses pembayaran secara otomatis.
+
+Sales Admin dan Super Admin dapat memakai:
+
+- `GET /api/v1/orders`
+- `GET /api/v1/orders/:id`
+- `POST /api/v1/orders`
+- `PATCH /api/v1/orders/:id`
+- `POST /api/v1/orders/:id/transition`
+
+Mutation internal memerlukan CSRF dan `Idempotency-Key`. Action yang tersedia adalah `SUBMIT`, `CONFIRM`, `COMPLETE`, dan `CANCEL` sesuai state saat ini. Draft/pending tidak mereservasi stok. `CONFIRM` mengunci saldo, memeriksa semua item, mengurangi stok, membuat satu movement per item, dan mengubah status dalam satu transaksi; satu item kurang menggagalkan seluruh proses. Draft publik kedaluwarsa setelah 24 jam. PII pelanggan dianonimkan 90 hari setelah `COMPLETED` atau `CANCELLED`, sedangkan data transaksi tetap disimpan.

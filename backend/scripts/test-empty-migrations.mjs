@@ -17,8 +17,8 @@ if (databaseUrl.pathname !== '/farmsight_test') {
   throw new Error('Migration test hanya boleh memakai farmsight_test.');
 }
 
-const schema = `plan006_empty_${randomBytes(6).toString('hex')}`;
-if (!/^plan006_empty_[0-9a-f]{12}$/.test(schema)) {
+const schema = `plan007_empty_${randomBytes(6).toString('hex')}`;
+if (!/^plan007_empty_[0-9a-f]{12}$/.test(schema)) {
   throw new Error('Nama schema sementara tidak valid.');
 }
 const quotedSchema = `"${schema}"`;
@@ -49,6 +49,9 @@ try {
     'audit_logs',
     'categories',
     'inventory_balances',
+    'order_items',
+    'order_mutations',
+    'orders',
     'products',
     'roles',
     'sessions',
