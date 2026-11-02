@@ -39,6 +39,7 @@ model User {
   createdOrders      Order[]         @relation("OrderCreator")
   confirmedOrders    Order[]         @relation("OrderConfirmer")
   orderMutations     OrderMutation[]
+  forecastRuns       ForecastRun[]
 
   @@index([roleId])
   @@index([isActive])
@@ -118,10 +119,62 @@ model Product {
   inventoryBalance InventoryBalance?
   stockMovements   StockMovement[]
   orderItems       OrderItem[]
+  demandWeeks      DemandWeek[]
+  forecastRuns     ForecastRun[]
 
   @@index([categoryId, isActive])
   @@index([isActive])
   @@map("products")
+}
+
+model DemandWeek {
+  productId  String          @map("product_id") @db.Uuid
+  week       DateTime        @db.Date
+  quantity   Decimal         @db.Decimal(15, 3)
+  bazaar     Boolean
+  miniBazaar Boolean         @map("mini_bazaar")
+  sourceHash String          @map("source_hash") @db.Char(64)
+  createdAt  DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  product    Product         @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  dataset    ForecastDataset @relation(fields: [sourceHash], references: [sourceHash], onDelete: Restrict, onUpdate: Cascade)
+
+  @@id([productId, week])
+  @@index([week])
+  @@map("demand_weeks")
+}
+
+model ForecastDataset {
+  sourceHash      String       @id @map("source_hash") @db.Char(64)
+  productCount    Int          @map("product_count")
+  startWeek       DateTime?    @map("start_week") @db.Date
+  endWeek         DateTime?    @map("end_week") @db.Date
+  unrecordedWeeks Json?        @map("unrecorded_weeks")
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  weeks           DemandWeek[]
+
+  @@map("forecast_datasets")
+}
+
+model ForecastRun {
+  id             String    @id @default(uuid()) @db.Uuid
+  productId      String    @map("product_id") @db.Uuid
+  actorUserId    String    @map("actor_user_id") @db.Uuid
+  idempotencyKey String    @map("idempotency_key") @db.Uuid
+  requestHash    String    @map("request_hash") @db.Char(64)
+  status         String    @db.VarChar(32)
+  inputHash      String    @map("input_hash") @db.Char(64)
+  inputSnapshot  Json      @map("input_snapshot")
+  modelVersion   String    @map("model_version") @db.VarChar(80)
+  result         Json?
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz(6)
+  product        Product   @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  actor          User      @relation(fields: [actorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([actorUserId, idempotencyKey])
+  @@index([productId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@map("forecast_runs")
 }
 
 model InventoryBalance {

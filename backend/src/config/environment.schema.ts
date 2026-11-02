@@ -40,6 +40,21 @@ const environmentSchema = Joi.object({
   WHATSAPP_BUSINESS_NUMBER: Joi.string()
     .pattern(/^\d{8,15}$/)
     .optional(),
+  FORECAST_PYTHON_PATH: Joi.string().max(2048).optional(),
+  FORECAST_WORKER_PATH: Joi.string().max(2048).optional(),
+  FORECAST_CAPTURE_START: Joi.string()
+    .pattern(/^\d{4}-\d{2}-\d{2}$/)
+    .custom((value: string, helpers) => {
+      const parsed = new Date(`${value}T00:00:00.000Z`);
+      if (
+        !Number.isFinite(parsed.getTime()) ||
+        parsed.toISOString().slice(0, 10) !== value ||
+        parsed.getUTCDay() !== 1
+      )
+        return helpers.error('any.invalid');
+      return value;
+    })
+    .optional(),
 }).unknown(true);
 
 export function validateEnvironment(
