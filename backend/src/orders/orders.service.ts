@@ -258,6 +258,9 @@ export class OrdersService {
           }
           if (next === 'COMPLETED') data.completedAt = now;
           if (next === 'CANCELLED') data.cancelledAt = now;
+          if (next === 'CONFIRMED' || next === 'CANCELLED') {
+            await tx.$executeRaw`UPDATE notifications SET active = false, updated_at = CURRENT_TIMESTAMP WHERE kind = 'ORDER_STOCK_INSUFFICIENT' AND target_id = ${id}::uuid AND active = true`;
+          }
           order = await tx.order.update({
             where: { id },
             data,
@@ -287,6 +290,12 @@ export class OrdersService {
       );
     } catch (error) {
       if (this.apiErrorCode(error) === 'ORDER_STOCK_INSUFFICIENT') {
+        try {
+          await this.prisma
+            .$executeRaw`INSERT INTO notifications (kind, target_id, recipient_role, message) VALUES ('ORDER_STOCK_INSUFFICIENT', ${id}::uuid, 'SALES_ADMIN', 'Stok tidak cukup untuk mengonfirmasi pesanan.') ON CONFLICT (kind, target_id, recipient_role) WHERE active DO NOTHING`;
+        } catch {
+          // A notification failure must not hide the original stock error.
+        }
         await this.prisma.auditLog.create({
           data: {
             actorUserId: actor.userId,
