@@ -76,4 +76,16 @@ describe('validateEnvironment', () => {
       }),
     ).toThrow('Konfigurasi environment tidak valid');
   });
+
+  it('validates the forecast coverage start as a real Monday', () => {
+    expect(
+      validateEnvironment({ ...required, FORECAST_CAPTURE_START: '2026-01-05' })
+        .FORECAST_CAPTURE_START,
+    ).toBe('2026-01-05');
+    for (const value of ['2026-01-06', '2026-02-30', 'invalid']) {
+      expect(() =>
+        validateEnvironment({ ...required, FORECAST_CAPTURE_START: value }),
+      ).toThrow('Konfigurasi environment tidak valid');
+    }
+  });
 });
