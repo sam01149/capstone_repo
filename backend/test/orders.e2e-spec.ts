@@ -302,6 +302,16 @@ describe('FarmSight order and public catalog API (e2e)', () => {
     await transition(sales, tooLargeId, 'SUBMIT');
     const rejected = await transition(sales, tooLargeId, 'CONFIRM', 409);
     expect(rejected.body.error.code).toBe('ORDER_STOCK_INSUFFICIENT');
+    await transition(sales, tooLargeId, 'CONFIRM', 409);
+    expect(
+      await prisma.notification.count({
+        where: {
+          targetId: tooLargeId,
+          kind: 'ORDER_STOCK_INSUFFICIENT',
+          active: true,
+        },
+      }),
+    ).toBe(1);
     expect(
       (
         await prisma.inventoryBalance.findUniqueOrThrow({
@@ -314,7 +324,7 @@ describe('FarmSight order and public catalog API (e2e)', () => {
       await prisma.auditLog.count({
         where: { action: 'ORDER_CONFIRM_REJECTED', targetId: tooLargeId },
       }),
-    ).toBe(1);
+    ).toBe(2);
 
     const first = await createInternal(sales, '7');
     const second = await createInternal(sales, '7');
@@ -452,6 +462,91 @@ describe('FarmSight order and public catalog API (e2e)', () => {
       }
     }
     expect(rateLimited).toBe(true);
+  });
+
+  it('menggabungkan notifikasi stok dan membuat ulang hanya setelah pulih', async () => {
+    const stock = await login('stock.orders@example.test', 'StockPassword123');
+    await prisma.product.update({
+      where: { id: productId },
+      data: { minimumStock: '5', reorderPoint: '6' },
+    });
+    await prisma.inventoryBalance.update({
+      where: { productId },
+      data: { currentStock: '4' },
+    });
+    await prisma.inventoryBalance.update({
+      where: { productId },
+      data: { currentStock: '3' },
+    });
+    const alerts = await prisma.notification.findMany({
+      where: { targetId: productId, kind: 'STOCK_ALERT', active: true },
+    });
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].message).toContain('minimum dan mencapai ROP');
+    const response = await stock.agent.get('/api/v1/notifications').expect(200);
+    expect(
+      response.body.data.items.some(
+        (n: { id: string }) => n.id === alerts[0].id,
+      ),
+    ).toBe(true);
+    await stock.agent
+      .post(`/api/v1/notifications/${alerts[0].id}/read`)
+      .set('x-csrf-token', stock.csrf)
+      .expect(201);
+    await prisma.inventoryBalance.update({
+      where: { productId },
+      data: { currentStock: '10' },
+    });
+    await prisma.inventoryBalance.update({
+      where: { productId },
+      data: { currentStock: '3' },
+    });
+    const history = await prisma.notification.findMany({
+      where: { targetId: productId, kind: 'STOCK_ALERT' },
+    });
+    expect(history).toHaveLength(2);
+    expect(history.filter((n) => n.active)).toHaveLength(1);
+  });
+
+  it('membatasi akses dashboard dan ekspor sesuai role', async () => {
+    const stock = await login('stock.orders@example.test', 'StockPassword123');
+    const sales = await login('sales.orders@example.test', 'SalesPassword123');
+    await request(app.getHttpServer())
+      .get('/api/v1/dashboards/inventory')
+      .expect(401);
+    await stock.agent.get('/api/v1/dashboards/inventory').expect(200);
+    await stock.agent.get('/api/v1/dashboards/sales').expect(403);
+    await sales.agent.get('/api/v1/reports/inventory').expect(403);
+    await stock.agent
+      .get('/api/v1/reports/inventory/export/csv')
+      .expect('Content-Type', /text\/csv/)
+      .expect(200);
+    await stock.agent
+      .get('/api/v1/reports/inventory/export/pdf')
+      .expect('Content-Type', /application\/pdf/)
+      .expect(200);
+  });
+
+  it('memasukkan penjualan setelah konfirmasi dan mengamankan sel CSV', async () => {
+    const sales = await login('sales.orders@example.test', 'SalesPassword123');
+    const stock = await login('stock.orders@example.test', 'StockPassword123');
+    const order = await createInternal(sales, '2');
+    const before = await sales.agent
+      .get('/api/v1/dashboards/sales')
+      .expect(200);
+    expect(before.body.data.totalSales).toBe('0');
+    await transition(sales, order.body.data.id, 'SUBMIT');
+    await transition(sales, order.body.data.id, 'CONFIRM');
+    const after = await sales.agent.get('/api/v1/dashboards/sales').expect(200);
+    expect(after.body.data.totalSales).toBe('50000');
+    await prisma.product.update({
+      where: { id: productId },
+      data: { name: '=1+1' },
+    });
+    const csv = await stock.agent
+      .get('/api/v1/reports/inventory/export/csv')
+      .expect(200);
+    expect(csv.text).toContain("'=1+1");
   });
 
   afterAll(async () => {

@@ -17,11 +17,14 @@ import { RequestIdMiddleware } from './common/http/request-id.middleware.js';
 import { ResponseInterceptor } from './common/http/response.interceptor.js';
 import { validateEnvironment } from './config/environment.schema.js';
 import { DatabaseModule } from './database/database.module.js';
+import { DashboardsModule } from './dashboards/dashboards.module.js';
 import { HealthModule } from './health/health.module.js';
 import { ForecastingModule } from './forecasting/forecasting.module.js';
 import { InventoryModule } from './inventory/inventory.module.js';
 import { ProductsModule } from './products/products.module.js';
 import { OrdersModule } from './orders/orders.module.js';
+import { ReportsModule } from './reports/reports.module.js';
+import { NotificationsModule } from './notifications/notifications.module.js';
 import { PublicCatalogModule } from './public-catalog/public-catalog.module.js';
 import { UsersModule } from './users/users.module.js';
 
@@ -34,6 +37,9 @@ import { UsersModule } from './users/users.module.js';
     }),
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]),
     DatabaseModule,
+    DashboardsModule,
+    ReportsModule,
+    NotificationsModule,
     AuthModule,
     UsersModule,
     CategoriesModule,
