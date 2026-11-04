@@ -15,4 +15,4 @@ Tanggung jawab tidak membatasi kolaborasi, tetapi setiap perubahan tetap harus m
 
 ## Status implementasi
 
-Source backend berada di `backend/`. Fondasi API, autentikasi, sesi yang dapat dicabut, CSRF, RBAC tiga role, serta pengelolaan pengguna internal lengkap sudah tersedia. Super Admin dapat melihat, membuat, memperbarui, mengubah role, menonaktifkan, mereset password, dan melihat aktivitas staf. Reset memakai password 8–16 karakter tanpa expiry; `mustChangePassword` menjadi penanda saran non-blocking. Frontend tidak diubah. Instruksi menjalankan aplikasi dan membuat Super Admin pertama terdapat di `backend/README.md`.
+Source backend berada di `backend/`. Fondasi API, autentikasi, sesi, CSRF, RBAC tiga role, pengguna internal, kategori/master produk, inventory, katalog publik, draft WhatsApp, serta pesanan sudah tersedia. Konfirmasi pesanan mengurangi stok dan mencatat movement penjualan secara atomik tanpa reservasi. Frontend, pembayaran online, bukti transfer, dan pengiriman otomatis tidak termasuk. Instruksi menjalankan aplikasi dan membuat Super Admin pertama terdapat di `backend/README.md`.

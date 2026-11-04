@@ -8,6 +8,7 @@ import type { AuthPrincipal } from '../common/auth/authenticated-request.js';
 import { ApiError } from '../common/http/api-error.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { Prisma } from '../generated/prisma/client.js';
+import { decimal } from '../inventory/decimal.utils.js';
 import type { CreateProductDto } from './dto/create-product.dto.js';
 import type {
   ListProductsQueryDto,
@@ -78,10 +79,12 @@ export class ProductsService {
             categoryId: dto.categoryId,
             price: dto.price,
             imageRef: dto.imageRef ?? null,
-            minimumStock: dto.minimumStock,
+            minimumStock: decimal(dto.minimumStock),
             leadTimeDays: dto.leadTimeDays,
-            safetyStock: dto.safetyStock,
-            reorderPoint: dto.reorderPoint,
+            safetyStock: decimal(dto.safetyStock),
+            reorderPoint: decimal(dto.reorderPoint),
+            stockUnit: dto.stockUnit,
+            inventoryBalance: { create: {} },
           },
           include: productWithCategory,
         });
@@ -153,7 +156,7 @@ export class ProductsService {
           dto.imageRef,
           current.imageRef,
         );
-        this.assign(
+        this.assignDecimal(
           data,
           changedFields,
           'minimumStock',
@@ -167,20 +170,28 @@ export class ProductsService {
           dto.leadTimeDays,
           current.leadTimeDays,
         );
-        this.assign(
+        this.assignDecimal(
           data,
           changedFields,
           'safetyStock',
           dto.safetyStock,
           current.safetyStock,
         );
-        this.assign(
+        this.assignDecimal(
           data,
           changedFields,
           'reorderPoint',
           dto.reorderPoint,
           current.reorderPoint,
         );
+        if (
+          dto.stockUnit !== undefined &&
+          dto.stockUnit !== current.stockUnit
+        ) {
+          await this.assertStockUnitEditable(tx, productId);
+          data.stockUnit = dto.stockUnit;
+          changedFields.push('stockUnit');
+        }
         if (
           dto.categoryId !== undefined &&
           dto.categoryId !== current.categoryId
@@ -253,6 +264,37 @@ export class ProductsService {
     if (value !== undefined && value !== current) {
       data[key] = value;
       changedFields.push(String(key));
+    }
+  }
+
+  private assignDecimal(
+    data: Prisma.ProductUpdateInput,
+    changedFields: string[],
+    key: 'minimumStock' | 'safetyStock' | 'reorderPoint',
+    value: string | undefined,
+    current: Prisma.Decimal,
+  ) {
+    if (value !== undefined && !current.equals(value)) {
+      data[key] = decimal(value);
+      changedFields.push(key);
+    }
+  }
+
+  private async assertStockUnitEditable(
+    tx: Prisma.TransactionClient,
+    productId: string,
+  ) {
+    await tx.$queryRaw`SELECT product_id FROM inventory_balances WHERE product_id = ${productId}::uuid FOR UPDATE`;
+    const [balance, movementCount] = await Promise.all([
+      tx.inventoryBalance.findUnique({ where: { productId } }),
+      tx.stockMovement.count({ where: { productId } }),
+    ]);
+    if (!balance || !balance.currentStock.isZero() || movementCount > 0) {
+      throw new ApiError(
+        HttpStatus.CONFLICT,
+        'STOCK_UNIT_LOCKED',
+        'Satuan stok tidak dapat diubah setelah stok atau riwayat pergerakan tersedia.',
+      );
     }
   }
 

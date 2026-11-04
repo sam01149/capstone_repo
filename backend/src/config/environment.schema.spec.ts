@@ -61,4 +61,31 @@ describe('validateEnvironment', () => {
       }),
     ).toThrow('COOKIE_SECURE wajib true');
   });
+
+  it('menerima nomor WhatsApp internasional dan menolak format tidak aman', () => {
+    expect(
+      validateEnvironment({
+        ...required,
+        WHATSAPP_BUSINESS_NUMBER: '6281234567890',
+      }).WHATSAPP_BUSINESS_NUMBER,
+    ).toBe('6281234567890');
+    expect(() =>
+      validateEnvironment({
+        ...required,
+        WHATSAPP_BUSINESS_NUMBER: '+62 812-3456-7890',
+      }),
+    ).toThrow('Konfigurasi environment tidak valid');
+  });
+
+  it('validates the forecast coverage start as a real Monday', () => {
+    expect(
+      validateEnvironment({ ...required, FORECAST_CAPTURE_START: '2026-01-05' })
+        .FORECAST_CAPTURE_START,
+    ).toBe('2026-01-05');
+    for (const value of ['2026-01-06', '2026-02-30', 'invalid']) {
+      expect(() =>
+        validateEnvironment({ ...required, FORECAST_CAPTURE_START: value }),
+      ).toThrow('Konfigurasi environment tidak valid');
+    }
+  });
 });

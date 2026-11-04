@@ -1,4 +1,9 @@
 import { Prisma } from '../generated/prisma/client.js';
+import { decimalString } from '../inventory/decimal.utils.js';
+import {
+  STOCK_UNIT_LABELS,
+  type StockUnit,
+} from '../inventory/inventory.constants.js';
 
 export const productWithCategory = {
   category: { select: { id: true, name: true, slug: true, isActive: true } },
@@ -19,10 +24,12 @@ export function toProductResponse(product: ProductWithCategory) {
     price: product.price,
     imageRef: product.imageRef,
     isActive: product.isActive,
-    minimumStock: product.minimumStock,
+    minimumStock: decimalString(product.minimumStock),
     leadTimeDays: product.leadTimeDays,
-    safetyStock: product.safetyStock,
-    reorderPoint: product.reorderPoint,
+    safetyStock: decimalString(product.safetyStock),
+    reorderPoint: decimalString(product.reorderPoint),
+    stockUnit: product.stockUnit,
+    stockUnitLabel: STOCK_UNIT_LABELS[product.stockUnit as StockUnit],
     createdAt: product.createdAt.toISOString(),
     updatedAt: product.updatedAt.toISOString(),
   };

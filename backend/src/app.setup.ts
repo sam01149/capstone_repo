@@ -17,7 +17,12 @@ export function configureApplication(app: INestApplication): void {
     origin: config.getOrThrow<string>('FRONTEND_ORIGIN'),
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'X-CSRF-Token', 'X-Request-Id'],
+    allowedHeaders: [
+      'Content-Type',
+      'X-CSRF-Token',
+      'X-Request-Id',
+      'Idempotency-Key',
+    ],
     exposedHeaders: ['X-Request-Id'],
   });
 }

@@ -31,6 +31,7 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:migrate:test": "node scripts/migrate-test-database.mjs",
+    "db:migrate:test:empty": "node scripts/test-empty-migrations.mjs",
     "env:init:local": "node scripts/init-local-env.mjs",
     "db:check:security": "node scripts/check-postgres-security.mjs",
     "db:seed:roles": "npm run build --silent && node scripts/seed-roles.mjs",
@@ -51,6 +52,7 @@
     "cookie-parser": "1.4.7",
     "dotenv": "18.0.7",
     "joi": "18.2.9",
+    "pdfkit": "^0.17.2",
     "pg": "8.23.1",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2"
@@ -62,6 +64,7 @@
     "@types/cookie-parser": "1.4.10",
     "@types/express": "5.0.6",
     "@types/node": "22.20.5",
+    "@types/pdfkit": "^0.17.3",
     "@types/pg": "8.23.1",
     "@types/supertest": "7.2.1",
     "@vitest/coverage-v8": "5.0.4",
