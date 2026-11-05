@@ -40,7 +40,9 @@ export class ReportsService {
           minimumStock: true,
           safetyStock: true,
           reorderPoint: true,
-          inventoryBalance: { select: { currentStock: true } },
+          inventoryBalance: {
+            select: { currentStock: true, reservedStock: true },
+          },
         },
         take: 1001,
         orderBy: { id: 'asc' },
@@ -50,6 +52,11 @@ export class ReportsService {
         produk: p.name,
         satuan: p.stockUnit,
         stok: p.inventoryBalance?.currentStock.toFixed(3) ?? '0.000',
+        dicadangkan: p.inventoryBalance?.reservedStock.toFixed(3) ?? '0.000',
+        tersedia:
+          p.inventoryBalance?.currentStock
+            .minus(p.inventoryBalance.reservedStock)
+            .toFixed(3) ?? '0.000',
         minimum: p.minimumStock.toFixed(3),
         safetyStock: p.safetyStock.toFixed(3),
         reorderPoint: p.reorderPoint.toFixed(3),
@@ -58,20 +65,22 @@ export class ReportsService {
       const data = await this.prisma.order.findMany({
         where: {
           status: { in: ['CONFIRMED', 'COMPLETED'] },
-          confirmedAt: { gte: from, lt: to },
+          stockDeductedAt: { gte: from, lt: to },
         },
         select: {
           publicCode: true,
           confirmedAt: true,
+          stockDeductedAt: true,
           status: true,
           totalAmount: true,
         },
         take: 1001,
-        orderBy: [{ confirmedAt: 'asc' }, { id: 'asc' }],
+        orderBy: [{ stockDeductedAt: 'asc' }, { id: 'asc' }],
       });
       rows = data.map((o) => ({
         kode: o.publicCode,
         dikonfirmasi: o.confirmedAt?.toISOString() ?? null,
+        stokKeluar: o.stockDeductedAt?.toISOString() ?? null,
         status: o.status,
         totalRupiah: o.totalAmount,
       }));
@@ -162,11 +171,13 @@ export class ReportsService {
         'produk',
         'satuan',
         'stok',
+        'dicadangkan',
+        'tersedia',
         'minimum',
         'safetyStock',
         'reorderPoint',
       ],
-      sales: ['kode', 'dikonfirmasi', 'status', 'totalRupiah'],
+      sales: ['kode', 'dikonfirmasi', 'stokKeluar', 'status', 'totalRupiah'],
       movements: [
         'tanggal',
         'sku',

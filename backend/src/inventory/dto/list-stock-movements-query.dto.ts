@@ -34,12 +34,12 @@ export class ListStockMovementsQueryDto {
   productId?: string;
 
   @IsOptional()
-  @IsIn(MOVEMENT_TYPES)
-  type?: MovementType;
+  @IsIn([...MOVEMENT_TYPES, 'SALE_OUT'])
+  type?: MovementType | 'SALE_OUT';
 
   @IsOptional()
-  @IsIn(MOVEMENT_ACTIONS)
-  action?: MovementAction;
+  @IsIn([...MOVEMENT_ACTIONS, 'CONFIRM_ORDER', 'COMPLETE_ORDER'])
+  action?: MovementAction | 'CONFIRM_ORDER' | 'COMPLETE_ORDER';
 
   @IsOptional()
   @IsUUID('4')
