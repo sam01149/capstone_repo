@@ -59,7 +59,9 @@ export class PublicCatalogService {
   }
 
   private map(product: PublicProduct) {
-    const stock = product.inventoryBalance?.currentStock;
+    const stock = product.inventoryBalance?.currentStock.minus(
+      product.inventoryBalance.reservedStock,
+    );
     return {
       id: product.id,
       slug: product.slug,

@@ -20,15 +20,16 @@ model Role {
 }
 
 model Notification {
-  id         String             @id @default(uuid()) @db.Uuid
-  kind       String             @db.VarChar(40)
-  targetId   String             @map("target_id") @db.Uuid
-  recipientRole String          @map("recipient_role") @db.VarChar(32)
-  message    String             @db.VarChar(500)
-  active     Boolean            @default(true)
-  createdAt  DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt  DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
-  reads      NotificationRead[]
+  id            String             @id @default(uuid()) @db.Uuid
+  kind          String             @db.VarChar(40)
+  targetId      String             @map("target_id") @db.Uuid
+  recipientRole String             @map("recipient_role") @db.VarChar(32)
+  message       String             @db.VarChar(500)
+  active        Boolean            @default(true)
+  createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  reads         NotificationRead[]
+
   @@index([recipientRole, createdAt])
   @@map("notifications")
 }
@@ -39,29 +40,30 @@ model NotificationRead {
   readAt         DateTime     @default(now()) @map("read_at") @db.Timestamptz(6)
   notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@id([notificationId, userId])
   @@map("notification_reads")
 }
 
 model User {
-  id                 String          @id @default(uuid()) @db.Uuid
-  name               String          @db.VarChar(120)
-  email              String          @db.VarChar(254)
-  emailNormalized    String          @unique @map("email_normalized") @db.VarChar(254)
-  passwordHash       String          @map("password_hash") @db.VarChar(255)
-  roleId             String          @map("role_id") @db.Uuid
-  isActive           Boolean         @default(true) @map("is_active")
-  mustChangePassword Boolean         @default(false) @map("must_change_password")
-  lastLoginAt        DateTime?       @map("last_login_at") @db.Timestamptz(6)
-  passwordChangedAt  DateTime        @default(now()) @map("password_changed_at") @db.Timestamptz(6)
-  createdAt          DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
-  role               Role            @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  id                 String             @id @default(uuid()) @db.Uuid
+  name               String             @db.VarChar(120)
+  email              String             @db.VarChar(254)
+  emailNormalized    String             @unique @map("email_normalized") @db.VarChar(254)
+  passwordHash       String             @map("password_hash") @db.VarChar(255)
+  roleId             String             @map("role_id") @db.Uuid
+  isActive           Boolean            @default(true) @map("is_active")
+  mustChangePassword Boolean            @default(false) @map("must_change_password")
+  lastLoginAt        DateTime?          @map("last_login_at") @db.Timestamptz(6)
+  passwordChangedAt  DateTime           @default(now()) @map("password_changed_at") @db.Timestamptz(6)
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  role               Role               @relation(fields: [roleId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   sessions           Session[]
-  auditLogs          AuditLog[]      @relation("AuditActor")
-  stockMovements     StockMovement[] @relation("StockMovementActor")
-  createdOrders      Order[]         @relation("OrderCreator")
-  confirmedOrders    Order[]         @relation("OrderConfirmer")
+  auditLogs          AuditLog[]         @relation("AuditActor")
+  stockMovements     StockMovement[]    @relation("StockMovementActor")
+  createdOrders      Order[]            @relation("OrderCreator")
+  confirmedOrders    Order[]            @relation("OrderConfirmer")
   orderMutations     OrderMutation[]
   forecastRuns       ForecastRun[]
   notificationReads  NotificationRead[]
@@ -203,11 +205,12 @@ model ForecastRun {
 }
 
 model InventoryBalance {
-  productId    String   @id @map("product_id") @db.Uuid
-  currentStock Decimal  @default(0) @map("current_stock") @db.Decimal(15, 3)
-  version      Int      @default(0)
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-  product      Product  @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  productId     String   @id @map("product_id") @db.Uuid
+  currentStock  Decimal  @default(0) @map("current_stock") @db.Decimal(15, 3)
+  reservedStock Decimal  @default(0) @map("reserved_stock") @db.Decimal(15, 3)
+  version       Int      @default(0)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([currentStock])
   @@map("inventory_balances")
@@ -258,6 +261,7 @@ model Order {
   expiresAt         DateTime?       @map("expires_at") @db.Timestamptz(6)
   confirmedAt       DateTime?       @map("confirmed_at") @db.Timestamptz(6)
   completedAt       DateTime?       @map("completed_at") @db.Timestamptz(6)
+  stockDeductedAt   DateTime?       @map("stock_deducted_at") @db.Timestamptz(6)
   cancelledAt       DateTime?       @map("cancelled_at") @db.Timestamptz(6)
   anonymizedAt      DateTime?       @map("anonymized_at") @db.Timestamptz(6)
   version           Int             @default(0)
@@ -272,6 +276,7 @@ model Order {
   @@index([source, createdAt])
   @@index([expiresAt])
   @@index([completedAt])
+  @@index([stockDeductedAt])
   @@index([cancelledAt])
   @@map("orders")
 }

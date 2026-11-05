@@ -234,15 +234,20 @@ export class OrdersService {
             order.status === 'PENDING_CONFIRMATION'
           ) {
             next = 'CONFIRMED';
-            await this.confirm(tx, order, actor, now);
-          } else if (action === 'COMPLETE' && order.status === 'CONFIRMED')
+            await this.confirm(tx, order);
+          } else if (action === 'COMPLETE' && order.status === 'CONFIRMED') {
             next = 'COMPLETED';
-          else if (
+            if (!order.stockDeductedAt)
+              await this.settleReservation(tx, order, actor, now, true);
+          } else if (
             action === 'CANCEL' &&
-            ['DRAFT', 'PENDING_CONFIRMATION'].includes(order.status)
-          )
+            (['DRAFT', 'PENDING_CONFIRMATION'].includes(order.status) ||
+              (order.status === 'CONFIRMED' && !order.stockDeductedAt))
+          ) {
             next = 'CANCELLED';
-          else
+            if (order.status === 'CONFIRMED')
+              await this.settleReservation(tx, order, actor, now, false);
+          } else
             throw new ApiError(
               409,
               'ORDER_TRANSITION_NOT_ALLOWED',
@@ -256,7 +261,10 @@ export class OrdersService {
             data.confirmedAt = now;
             data.confirmedBy = { connect: { id: actor.userId } };
           }
-          if (next === 'COMPLETED') data.completedAt = now;
+          if (next === 'COMPLETED') {
+            data.completedAt = now;
+            if (!order.stockDeductedAt) data.stockDeductedAt = now;
+          }
           if (next === 'CANCELLED') data.cancelledAt = now;
           if (next === 'CONFIRMED' || next === 'CANCELLED') {
             await tx.$executeRaw`UPDATE notifications SET active = false, updated_at = CURRENT_TIMESTAMP WHERE kind = 'ORDER_STOCK_INSUFFICIENT' AND target_id = ${id}::uuid AND active = true`;
@@ -266,6 +274,21 @@ export class OrdersService {
             data,
             include: orderInclude,
           });
+          if (action === 'SUBMIT') {
+            await tx.notification.create({
+              data: {
+                kind: 'NEW_ORDER',
+                targetId: id,
+                recipientRole: 'SALES_ADMIN',
+                message: `Pesanan ${order.publicCode} menunggu konfirmasi.`,
+              },
+            });
+          } else {
+            await tx.notification.updateMany({
+              where: { kind: 'NEW_ORDER', targetId: id, active: true },
+              data: { active: false },
+            });
+          }
           await tx.auditLog.create({
             data: {
               actorUserId: actor.userId,
@@ -441,12 +464,7 @@ export class OrdersService {
     return { items, total };
   }
 
-  private async confirm(
-    tx: Prisma.TransactionClient,
-    order: OrderRecord,
-    actor: AuthPrincipal,
-    now: Date,
-  ) {
+  private async confirm(tx: Prisma.TransactionClient, order: OrderRecord) {
     const ids = order.items.map((x) => x.productId).sort();
     await tx.$queryRaw`SELECT product_id FROM inventory_balances WHERE product_id = ANY(${ids}::uuid[]) ORDER BY product_id FOR UPDATE`;
     const products = await tx.product.findMany({
@@ -462,26 +480,71 @@ export class OrdersService {
           'ORDER_ITEM_PRODUCT_INACTIVE',
           'Salah satu produk tidak dapat diproses.',
         );
-      if (p.inventoryBalance.currentStock.lt(item.quantity))
+      if (
+        p.inventoryBalance.currentStock
+          .minus(p.inventoryBalance.reservedStock)
+          .lt(item.quantity)
+      )
         throw new ApiError(
           409,
           'ORDER_STOCK_INSUFFICIENT',
-          'Stok salah satu produk tidak mencukupi.',
+          'Stok tersedia salah satu produk tidak mencukupi.',
         );
     }
     for (const item of order.items) {
-      const p = byId.get(item.productId)!;
-      const before = p.inventoryBalance!.currentStock;
-      const after = before.sub(item.quantity);
       await tx.inventoryBalance.update({
         where: { productId: item.productId },
-        data: { currentStock: after, version: { increment: 1 } },
+        data: {
+          reservedStock: { increment: item.quantity },
+          version: { increment: 1 },
+        },
       });
+    }
+  }
+
+  private async settleReservation(
+    tx: Prisma.TransactionClient,
+    order: OrderRecord,
+    actor: AuthPrincipal,
+    now: Date,
+    complete: boolean,
+  ) {
+    const ids = order.items.map((item) => item.productId).sort();
+    await tx.$queryRaw`SELECT product_id FROM inventory_balances WHERE product_id = ANY(${ids}::uuid[]) ORDER BY product_id FOR UPDATE`;
+    const balances = await tx.inventoryBalance.findMany({
+      where: { productId: { in: ids } },
+    });
+    const byId = new Map(
+      balances.map((balance) => [balance.productId, balance]),
+    );
+    for (const item of order.items) {
+      const balance = byId.get(item.productId);
+      if (!balance || balance.reservedStock.lt(item.quantity)) {
+        throw new ApiError(
+          409,
+          'ORDER_RESERVATION_INVALID',
+          'Reservasi pesanan tidak sesuai. Hubungi administrator.',
+        );
+      }
+    }
+    for (const item of order.items) {
+      const balance = byId.get(item.productId)!;
+      const before = balance.currentStock;
+      const after = complete ? before.minus(item.quantity) : before;
+      await tx.inventoryBalance.update({
+        where: { productId: item.productId },
+        data: {
+          currentStock: after,
+          reservedStock: { decrement: item.quantity },
+          version: { increment: 1 },
+        },
+      });
+      if (!complete) continue;
       await tx.stockMovement.create({
         data: {
           productId: item.productId,
           type: 'SALE_OUT',
-          action: 'CONFIRM_ORDER',
+          action: 'COMPLETE_ORDER',
           quantity: item.quantity,
           stockBefore: before,
           stockAfter: after,
@@ -696,10 +759,18 @@ export class OrdersService {
         quantity: decimalString(i.quantity),
         subtotalAmount: i.subtotalAmount,
         movementId: internal ? i.stockMovement?.id : undefined,
+        reservedQuantity: internal
+          ? o.status === 'CONFIRMED' && !o.stockDeductedAt
+            ? decimalString(i.quantity)
+            : '0.000'
+          : undefined,
       })),
       totalAmount: o.totalAmount,
       currency: o.currency,
       expiresAt: o.expiresAt?.toISOString() ?? null,
+      stockDeductedAt: internal
+        ? (o.stockDeductedAt?.toISOString() ?? null)
+        : undefined,
       createdAt: o.createdAt.toISOString(),
       updatedAt: o.updatedAt.toISOString(),
     };

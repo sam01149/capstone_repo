@@ -3,7 +3,7 @@ import { DashboardsService } from './dashboards.service.js';
 import type { PrismaService } from '../database/prisma.service.js';
 
 describe('DashboardsService', () => {
-  it('menghitung nilai dan produk terlaris hanya dari order dikonfirmasi atau selesai', async () => {
+  it('mengembalikan ringkasan nilai dan produk terlaris dari query penjualan', async () => {
     const prisma = {
       order: {
         groupBy: vi

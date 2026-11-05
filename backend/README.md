@@ -2,6 +2,21 @@
 
 Backend FarmSight menggunakan NestJS, Prisma ORM, dan PostgreSQL. Autentikasi/RBAC, pengguna internal, kategori/master produk, inventory, katalog publik, draft WhatsApp, pesanan, serta integrasi movement penjualan telah tersedia; frontend serta modul bisnis lain dikerjakan pada paket terpisah.
 
+## Alur reservasi dan notifikasi pesanan
+
+- `SUBMIT`: draft menjadi `PENDING_CONFIRMATION` dan membuat satu notifikasi `NEW_ORDER` untuk Sales Admin. Pembuatan draft publik sendiri tidak mengirim notifikasi atau WhatsApp otomatis.
+- `CONFIRM`: stok bebas dicadangkan dan order menjadi `CONFIRMED`; stok fisik belum berkurang.
+- `COMPLETE`: reservasi ditutup, stok fisik dikurangi dan satu `SALE_OUT`/`COMPLETE_ORDER` per item dicatat dalam transaksi yang sama dengan status, audit dan idempotensi.
+- `CANCEL`: sebelum stock out, reservasi dilepas tanpa movement fiktif. Order yang sudah stock out tidak dapat dibatalkan melalui perubahan status ini.
+- `currentStock` adalah fisik, `reservedStock` adalah stok yang dicadangkan, `availableStock` adalah fisik dikurangi reservasi. Mutation manual tidak boleh mengurangi fisik di bawah reserved. Katalog publik menggunakan saldo bebas untuk availability tanpa menampilkan angka internal.
+- Detail order internal menambah `stockDeductedAt` dan `items[].reservedQuantity`. Dashboard/laporan penjualan mengikuti waktu stock out; reservasi belum dihitung sebagai penjualan. Inventory/report menampilkan stok fisik, dicadangkan dan tersedia secara terpisah. Peringatan minimum/ROP tetap memakai stok fisik.
+
+Migration `20261105070000_order_stock_reservations` menandai order lama dari `SALE_OUT` yang sudah ada tanpa mengembalikan saldo atau memotong ulang ketika order diselesaikan. Sebelum rollout, hentikan writer versi lama, backup dan tinjau kelengkapan movement order lama. Deploy schema/backend bersama dan koordinasikan perubahan semantik `CONFIRM`/`COMPLETE` dengan frontend. Jangan mengembalikan backend lama ketika masih ada reservasi aktif; gunakan forward-fix yang direview.
+
+Verifikasi migration terisolasi: `npm run db:migrate:test:empty` untuk schema kosong dan `npm run db:migrate:test:reservations` untuk upgrade fixture legacy. Keduanya menolak target selain `farmsight_test`. Penerapan pada development/produksi tetap langkah deployment terpisah.
+
+Model runtime memakai pipeline notebook, sedangkan heuristik SS/ROP untuk produk di luar kelayakan model tersedia pada notebook analisis offline dan belum otomatis diimpor ke runtime. Skor model yang sama memilih ARIMA mengikuti urutan metode notebook. SQLite notebook dan PostgreSQL aplikasi adalah dua lapisan berbeda; tidak ada klaim sinkronisasi otomatis.
+
 Integrasi forecasting pada branch ini memakai proses Python terpisah dan fungsi dari notebook Rania. Siapkan Python 3.12.13 dalam virtual environment, lalu jalankan `python -m pip install -r forecast-worker/requirements.lock` dari direktori `backend`. Atur `FORECAST_PYTHON_PATH` jika executable virtual environment tidak berada di PATH; `FORECAST_WORKER_PATH` opsional jika direktori kerja backend berbeda. Analisis berjalan asinkron dan memerlukan histori mingguan yang telah ditinjau dan dipetakan, lead time produk, serta data event eksplisit. `FORECAST_CAPTURE_START` hanya diisi dengan tanggal Senin `YYYY-MM-DD` jika tim telah memastikan seluruh penjualan toko tercatat di FarmSight sejak tanggal itu. Tanpa data yang cukup, hasil dinyatakan belum tersedia. Rekomendasi berdasarkan ROP tidak menentukan jumlah pembelian otomatis.
 
 ## Stack yang dipin

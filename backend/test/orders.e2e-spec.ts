@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { type INestApplication, RequestMethod } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
+import { ThrottlerStorage, ThrottlerStorageService } from '@nestjs/throttler';
 import request from 'supertest';
 import { AppModule } from '../src/app.module.js';
 import { configureApplication } from '../src/app.setup.js';
@@ -28,6 +29,10 @@ describe('FarmSight order and public catalog API (e2e)', () => {
   });
 
   beforeEach(async () => {
+    app.get<ThrottlerStorageService>(ThrottlerStorage).onApplicationShutdown();
+    await prisma.$executeRawUnsafe(
+      'DROP TRIGGER IF EXISTS fail_workflow_notification_trigger ON notifications; DROP FUNCTION IF EXISTS fail_workflow_notification(); DROP TRIGGER IF EXISTS fail_workflow_settlement_trigger ON audit_logs; DROP FUNCTION IF EXISTS fail_workflow_settlement();',
+    );
     await prisma.orderMutation.deleteMany();
     await prisma.stockMovement.deleteMany();
     await prisma.orderItem.deleteMany();
@@ -249,7 +254,7 @@ describe('FarmSight order and public catalog API (e2e)', () => {
       .expect(400);
   });
 
-  it('mengurangi stok tepat sekali ketika order dikonfirmasi', async () => {
+  it('mereservasi saat konfirmasi dan mengurangi stok tepat sekali saat selesai', async () => {
     const sales = await login('sales.orders@example.test', 'SalesPassword123');
     const created = await createInternal(sales, '2.5');
     const orderId = created.body.data.id as string;
@@ -270,12 +275,14 @@ describe('FarmSight order and public catalog API (e2e)', () => {
     const balance = await prisma.inventoryBalance.findUniqueOrThrow({
       where: { productId },
     });
-    expect(balance.currentStock.toFixed(3)).toBe('7.500');
+    expect(balance.currentStock.toFixed(3)).toBe('10.000');
+    expect(balance.reservedStock.toFixed(3)).toBe('2.500');
+    expect(first.body.data.items[0].reservedQuantity).toBe('2.500');
     expect(
       await prisma.stockMovement.count({
         where: { referenceId: orderId, type: 'SALE_OUT' },
       }),
-    ).toBe(1);
+    ).toBe(0);
     const audit = await prisma.auditLog.findFirstOrThrow({
       where: { action: 'ORDER_CONFIRM', targetId: orderId },
     });
@@ -289,10 +296,30 @@ describe('FarmSight order and public catalog API (e2e)', () => {
       .set('idempotency-key', randomUUID())
       .send({ customerName: 'Tidak Boleh' })
       .expect(409);
+    const completeKey = randomUUID();
+    const complete = () =>
+      sales.agent
+        .post(`/api/v1/orders/${orderId}/transition`)
+        .set('x-csrf-token', sales.csrf)
+        .set('idempotency-key', completeKey)
+        .send({ action: 'COMPLETE' });
+    await complete().expect(201);
+    await complete().expect(201);
     await transition(sales, orderId, 'CANCEL', 409);
-    await transition(sales, orderId, 'COMPLETE');
     await transition(sales, orderId, 'COMPLETE', 409);
     expect(await prisma.stockMovement.count()).toBe(1);
+    const settled = await prisma.inventoryBalance.findUniqueOrThrow({
+      where: { productId },
+    });
+    expect(settled.currentStock.toFixed(3)).toBe('7.500');
+    expect(settled.reservedStock.toFixed(3)).toBe('0.000');
+    expect((await prisma.stockMovement.findFirstOrThrow()).action).toBe(
+      'COMPLETE_ORDER',
+    );
+    const movementList = await sales.agent
+      .get('/api/v1/inventory/movements?type=SALE_OUT&action=COMPLETE_ORDER')
+      .expect(200);
+    expect(movementList.body.data.items).toHaveLength(1);
   });
 
   it('menolak stok kurang tanpa efek parsial dan mengunci persaingan konfirmasi', async () => {
@@ -350,7 +377,14 @@ describe('FarmSight order and public catalog API (e2e)', () => {
           where: { productId },
         })
       ).currentStock.toFixed(3),
-    ).toBe('3.000');
+    ).toBe('10.000');
+    expect(
+      (
+        await prisma.inventoryBalance.findUniqueOrThrow({
+          where: { productId },
+        })
+      ).reservedStock.toFixed(3),
+    ).toBe('7.000');
   });
 
   it('membatalkan draft kedaluwarsa dan menganonimkan PII terminal setelah 90 hari', async () => {
@@ -436,6 +470,7 @@ describe('FarmSight order and public catalog API (e2e)', () => {
       });
       expect(order.status).toBe('PENDING_CONFIRMATION');
       expect(balance.currentStock.toFixed(3)).toBe('10.000');
+      expect(balance.reservedStock.toFixed(3)).toBe('0.000');
       expect(await prisma.stockMovement.count()).toBe(0);
     } finally {
       await prisma.$executeRawUnsafe(
@@ -527,7 +562,7 @@ describe('FarmSight order and public catalog API (e2e)', () => {
       .expect(200);
   });
 
-  it('memasukkan penjualan setelah konfirmasi dan mengamankan sel CSV', async () => {
+  it('menghitung penjualan pada stock out, bukan reservasi, dan mengamankan sel CSV', async () => {
     const sales = await login('sales.orders@example.test', 'SalesPassword123');
     const stock = await login('stock.orders@example.test', 'StockPassword123');
     const order = await createInternal(sales, '2');
@@ -537,8 +572,22 @@ describe('FarmSight order and public catalog API (e2e)', () => {
     expect(before.body.data.totalSales).toBe('0');
     await transition(sales, order.body.data.id, 'SUBMIT');
     await transition(sales, order.body.data.id, 'CONFIRM');
+    const reserved = await sales.agent
+      .get('/api/v1/dashboards/sales')
+      .expect(200);
+    expect(reserved.body.data.totalSales).toBe('0');
+    const reservedReport = await sales.agent
+      .get('/api/v1/reports/sales')
+      .expect(200);
+    expect(reservedReport.body.data.rows).toHaveLength(0);
+    await transition(sales, order.body.data.id, 'COMPLETE');
     const after = await sales.agent.get('/api/v1/dashboards/sales').expect(200);
     expect(after.body.data.totalSales).toBe('50000');
+    const soldReport = await sales.agent
+      .get('/api/v1/reports/sales')
+      .expect(200);
+    expect(soldReport.body.data.rows).toHaveLength(1);
+    expect(soldReport.body.data.rows[0].stokKeluar).toEqual(expect.any(String));
     await prisma.product.update({
       where: { id: productId },
       data: { name: '=1+1' },
@@ -547,6 +596,310 @@ describe('FarmSight order and public catalog API (e2e)', () => {
       .get('/api/v1/reports/inventory/export/csv')
       .expect(200);
     expect(csv.text).toContain("'=1+1");
+  });
+
+  it('membatalkan reservasi tanpa movement dan melindungi saldo bebas dari mutasi manual', async () => {
+    const sales = await login('sales.orders@example.test', 'SalesPassword123');
+    const stock = await login('stock.orders@example.test', 'StockPassword123');
+    const order = await createInternal(sales, '10');
+    const id = order.body.data.id as string;
+    await transition(sales, id, 'SUBMIT');
+    await transition(sales, id, 'CONFIRM');
+    const inventory = await stock.agent
+      .get(`/api/v1/inventory/${productId}`)
+      .expect(200);
+    expect(inventory.body.data).toMatchObject({
+      currentStock: '10.000',
+      reservedStock: '10.000',
+      availableStock: '0.000',
+    });
+    const catalog = await request(app.getHttpServer())
+      .get('/api/v1/public/products/pupuk-npk-order')
+      .expect(200);
+    expect(catalog.body.data.availability).toBe('OUT_OF_STOCK');
+    const blocked = await stock.agent
+      .post('/api/v1/inventory/movements')
+      .set('x-csrf-token', stock.csrf)
+      .set('idempotency-key', randomUUID())
+      .send({
+        productId,
+        action: 'REDUCE_STOCK',
+        quantity: '1',
+        reasonCode: 'MANUAL_REDUCTION',
+        note: 'Uji perlindungan reservasi',
+      })
+      .expect(409);
+    expect(blocked.body.error.code).toBe('STOCK_RESERVED');
+    const key = randomUUID();
+    for (let i = 0; i < 2; i++) {
+      await sales.agent
+        .post(`/api/v1/orders/${id}/transition`)
+        .set('x-csrf-token', sales.csrf)
+        .set('idempotency-key', key)
+        .send({ action: 'CANCEL' })
+        .expect(201);
+    }
+    const balance = await prisma.inventoryBalance.findUniqueOrThrow({
+      where: { productId },
+    });
+    expect(balance.currentStock.toFixed(3)).toBe('10.000');
+    expect(balance.reservedStock.toFixed(3)).toBe('0.000');
+    expect(await prisma.stockMovement.count()).toBe(0);
+    await transition(sales, id, 'COMPLETE', 409);
+    const available = await request(app.getHttpServer())
+      .get('/api/v1/public/products/pupuk-npk-order')
+      .expect(200);
+    expect(available.body.data.availability).toBe('AVAILABLE');
+  });
+
+  it('mengirim satu notifikasi saat submit, terisolasi per role, dan mengarsipkan saat diproses', async () => {
+    const sales = await login('sales.orders@example.test', 'SalesPassword123');
+    const stock = await login('stock.orders@example.test', 'StockPassword123');
+    const admin = await login('admin.orders@example.test', 'AdminPassword123');
+    const order = await createInternal(sales);
+    const id = order.body.data.id as string;
+    expect(await prisma.notification.count({ where: { targetId: id } })).toBe(
+      0,
+    );
+    const key = randomUUID();
+    const submit = () =>
+      sales.agent
+        .post(`/api/v1/orders/${id}/transition`)
+        .set('x-csrf-token', sales.csrf)
+        .set('idempotency-key', key)
+        .send({ action: 'SUBMIT' });
+    const results = await Promise.all([submit(), submit()]);
+    expect(results.map((r) => r.status)).toEqual([201, 201]);
+    const alerts = await prisma.notification.findMany({
+      where: { targetId: id, kind: 'NEW_ORDER' },
+    });
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].recipientRole).toBe('SALES_ADMIN');
+    const list = await sales.agent.get('/api/v1/notifications').expect(200);
+    expect(
+      list.body.data.items.some(
+        (item: { id: string }) => item.id === alerts[0].id,
+      ),
+    ).toBe(true);
+    for (const actor of [stock, admin]) {
+      const other = await actor.agent.get('/api/v1/notifications').expect(200);
+      expect(
+        other.body.data.items.some(
+          (item: { id: string }) => item.id === alerts[0].id,
+        ),
+      ).toBe(false);
+      await actor.agent
+        .post(`/api/v1/notifications/${alerts[0].id}/read`)
+        .set('x-csrf-token', actor.csrf)
+        .expect(404);
+    }
+    await transition(sales, id, 'CONFIRM');
+    expect(
+      (
+        await prisma.notification.findUniqueOrThrow({
+          where: { id: alerts[0].id },
+        })
+      ).active,
+    ).toBe(false);
+    expect(
+      await prisma.notification.count({
+        where: { targetId: id, kind: 'NEW_ORDER' },
+      }),
+    ).toBe(1);
+  });
+
+  it('rollback submit, complete dan cancel bersama audit atau notifikasi yang gagal', async () => {
+    const sales = await login('sales.orders@example.test', 'SalesPassword123');
+    const order = await createInternal(sales, '4');
+    const id = order.body.data.id as string;
+    await prisma.$executeRawUnsafe(
+      `CREATE FUNCTION fail_workflow_notification() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.kind = 'NEW_ORDER' THEN RAISE EXCEPTION 'forced'; END IF; RETURN NEW; END $$; CREATE TRIGGER fail_workflow_notification_trigger BEFORE INSERT ON notifications FOR EACH ROW EXECUTE FUNCTION fail_workflow_notification();`,
+    );
+    try {
+      await transition(sales, id, 'SUBMIT', 500);
+      expect(
+        (await prisma.order.findUniqueOrThrow({ where: { id } })).status,
+      ).toBe('DRAFT');
+      expect(await prisma.notification.count({ where: { targetId: id } })).toBe(
+        0,
+      );
+      expect(
+        await prisma.orderMutation.count({
+          where: { orderId: id, kind: 'SUBMIT' },
+        }),
+      ).toBe(0);
+    } finally {
+      await prisma.$executeRawUnsafe(
+        'DROP TRIGGER fail_workflow_notification_trigger ON notifications; DROP FUNCTION fail_workflow_notification();',
+      );
+    }
+    await transition(sales, id, 'SUBMIT');
+    await transition(sales, id, 'CONFIRM');
+    await prisma.$executeRawUnsafe(
+      `CREATE FUNCTION fail_workflow_settlement() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action IN ('ORDER_COMPLETE', 'ORDER_CANCEL') THEN RAISE EXCEPTION 'forced'; END IF; RETURN NEW; END $$; CREATE TRIGGER fail_workflow_settlement_trigger BEFORE INSERT ON audit_logs FOR EACH ROW EXECUTE FUNCTION fail_workflow_settlement();`,
+    );
+    try {
+      for (const action of ['COMPLETE', 'CANCEL']) {
+        await transition(sales, id, action, 500);
+        const balance = await prisma.inventoryBalance.findUniqueOrThrow({
+          where: { productId },
+        });
+        expect(balance.currentStock.toFixed(3)).toBe('10.000');
+        expect(balance.reservedStock.toFixed(3)).toBe('4.000');
+        expect(
+          (await prisma.order.findUniqueOrThrow({ where: { id } })).status,
+        ).toBe('CONFIRMED');
+        expect(await prisma.stockMovement.count()).toBe(0);
+      }
+    } finally {
+      await prisma.$executeRawUnsafe(
+        'DROP TRIGGER fail_workflow_settlement_trigger ON audit_logs; DROP FUNCTION fail_workflow_settlement();',
+      );
+    }
+    await transition(sales, id, 'COMPLETE');
+  });
+
+  it('tidak memotong ulang order lama yang sudah stock out saat konfirmasi', async () => {
+    const sales = await login('sales.orders@example.test', 'SalesPassword123');
+    const order = await createInternal(sales, '2');
+    const id = order.body.data.id as string;
+    const legacy = await prisma.order.update({
+      where: { id },
+      data: {
+        status: 'CONFIRMED',
+        confirmedAt: new Date(),
+        stockDeductedAt: new Date(),
+      },
+      include: { items: true },
+    });
+    const actor = await prisma.user.findUniqueOrThrow({
+      where: { emailNormalized: 'sales.orders@example.test' },
+    });
+    await prisma.inventoryBalance.update({
+      where: { productId },
+      data: { currentStock: '8' },
+    });
+    await prisma.stockMovement.create({
+      data: {
+        productId,
+        orderItemId: legacy.items[0].id,
+        actorUserId: actor.id,
+        type: 'SALE_OUT',
+        action: 'CONFIRM_ORDER',
+        quantity: '2',
+        stockBefore: '10',
+        stockAfter: '8',
+        reasonCode: 'SALE',
+        referenceType: 'ORDER',
+        referenceId: id,
+        idempotencyKey: randomUUID(),
+        payloadHash: 'a'.repeat(64),
+        occurredAt: legacy.stockDeductedAt!,
+      },
+    });
+    await transition(sales, id, 'CANCEL', 409);
+    await transition(sales, id, 'COMPLETE');
+    const balance = await prisma.inventoryBalance.findUniqueOrThrow({
+      where: { productId },
+    });
+    expect(balance.currentStock.toFixed(3)).toBe('8.000');
+    expect(balance.reservedStock.toFixed(3)).toBe('0.000');
+    expect(await prisma.stockMovement.count()).toBe(1);
+    expect(
+      (await sales.agent.get('/api/v1/dashboards/sales').expect(200)).body.data
+        .totalSales,
+    ).toBe('50000');
+  });
+
+  it('mereservasi multi-produk seluruhnya atau menolak seluruhnya', async () => {
+    const sales = await login('sales.orders@example.test', 'SalesPassword123');
+    const source = await prisma.product.findUniqueOrThrow({
+      where: { id: productId },
+    });
+    const second = await prisma.product.create({
+      data: {
+        sku: 'SECOND',
+        skuNormalized: 'second',
+        name: 'Second',
+        slug: 'second',
+        categoryId: source.categoryId,
+        price: 1000,
+        inventoryBalance: { create: { currentStock: '1' } },
+      },
+    });
+    const order = await sales.agent
+      .post('/api/v1/orders')
+      .set('x-csrf-token', sales.csrf)
+      .set('idempotency-key', randomUUID())
+      .send({
+        customerName: 'Uji multi-produk',
+        items: [
+          { productId, quantity: '3' },
+          { productId: second.id, quantity: '2' },
+        ],
+      })
+      .expect(201);
+    const id = order.body.data.id as string;
+    await transition(sales, id, 'SUBMIT');
+    await transition(sales, id, 'CONFIRM', 409);
+    const untouched = await prisma.inventoryBalance.findMany({
+      where: { productId: { in: [productId, second.id] } },
+    });
+    expect(untouched.every((balance) => balance.reservedStock.isZero())).toBe(
+      true,
+    );
+    await prisma.inventoryBalance.update({
+      where: { productId: second.id },
+      data: { currentStock: '2' },
+    });
+    await transition(sales, id, 'CONFIRM');
+    expect(await prisma.stockMovement.count()).toBe(0);
+    await transition(sales, id, 'COMPLETE');
+    expect(
+      (
+        await prisma.inventoryBalance.findUniqueOrThrow({
+          where: { productId },
+        })
+      ).currentStock.toFixed(3),
+    ).toBe('7.000');
+    expect(
+      (
+        await prisma.inventoryBalance.findUniqueOrThrow({
+          where: { productId: second.id },
+        })
+      ).currentStock.toFixed(3),
+    ).toBe('0.000');
+    expect(
+      await prisma.stockMovement.count({ where: { referenceId: id } }),
+    ).toBe(2);
+  });
+
+  it('menserialisasi persaingan complete dan cancel tanpa pelepasan atau pemotongan ganda', async () => {
+    const sales = await login('sales.orders@example.test', 'SalesPassword123');
+    const order = await createInternal(sales, '3');
+    const id = order.body.data.id as string;
+    await transition(sales, id, 'SUBMIT');
+    await transition(sales, id, 'CONFIRM');
+    const act = (action: string) =>
+      sales.agent
+        .post(`/api/v1/orders/${id}/transition`)
+        .set('x-csrf-token', sales.csrf)
+        .set('idempotency-key', randomUUID())
+        .send({ action });
+    const responses = await Promise.all([act('COMPLETE'), act('CANCEL')]);
+    expect(responses.map((r) => r.status).sort()).toEqual([201, 409]);
+    const final = await prisma.order.findUniqueOrThrow({ where: { id } });
+    const balance = await prisma.inventoryBalance.findUniqueOrThrow({
+      where: { productId },
+    });
+    expect(['COMPLETED', 'CANCELLED']).toContain(final.status);
+    expect(balance.reservedStock.toFixed(3)).toBe('0.000');
+    expect(balance.currentStock.toFixed(3)).toBe(
+      final.status === 'COMPLETED' ? '7.000' : '10.000',
+    );
+    expect(await prisma.stockMovement.count()).toBe(
+      final.status === 'COMPLETED' ? 1 : 0,
+    );
   });
 
   afterAll(async () => {

@@ -32,6 +32,7 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:migrate:test": "node scripts/migrate-test-database.mjs",
     "db:migrate:test:empty": "node scripts/test-empty-migrations.mjs",
+    "db:migrate:test:reservations": "node scripts/test-order-reservation-migration.mjs",
     "env:init:local": "node scripts/init-local-env.mjs",
     "db:check:security": "node scripts/check-postgres-security.mjs",
     "db:seed:roles": "npm run build --silent && node scripts/seed-roles.mjs",

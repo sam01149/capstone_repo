@@ -21,7 +21,7 @@ describe('ReportsService', () => {
       ROLE_CODES.SALES_ADMIN,
     );
     expect(file.buffer.toString('utf8')).toContain(
-      '"kode","dikonfirmasi","status","totalRupiah"',
+      '"kode","dikonfirmasi","stokKeluar","status","totalRupiah"',
     );
   });
 

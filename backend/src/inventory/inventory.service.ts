@@ -209,6 +209,13 @@ export class InventoryService {
             'Stok tidak mencukupi untuk tindakan ini.',
           );
         }
+        if (after.lt(product.inventoryBalance.reservedStock)) {
+          throw new ApiError(
+            HttpStatus.CONFLICT,
+            'STOCK_RESERVED',
+            'Stok sudah dicadangkan untuk pesanan. Batalkan reservasi terkait sebelum mengurangi stok.',
+          );
+        }
         this.assertProductState(product.isActive, dto.action, change.delta);
 
         if (dto.action === 'SET_OPENING_BALANCE') {
@@ -437,6 +444,14 @@ export class InventoryService {
       stockUnit: product.stockUnit,
       stockUnitLabel: STOCK_UNIT_LABELS[product.stockUnit as StockUnit],
       currentStock: decimalString(currentStock),
+      reservedStock: decimalString(
+        product.inventoryBalance?.reservedStock ?? decimal(0),
+      ),
+      availableStock: decimalString(
+        currentStock.minus(
+          product.inventoryBalance?.reservedStock ?? decimal(0),
+        ),
+      ),
       minimumStock: decimalString(product.minimumStock),
       safetyStock: decimalString(product.safetyStock),
       reorderPoint: decimalString(product.reorderPoint),

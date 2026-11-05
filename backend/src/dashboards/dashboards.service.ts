@@ -28,7 +28,7 @@ export class DashboardsService {
       }),
       this.prisma.$queryRaw<
         Array<{ total: string }>
-      >`SELECT COALESCE(SUM(total_amount), 0)::text AS total FROM orders WHERE status IN ('CONFIRMED', 'COMPLETED') AND confirmed_at >= ${period.gte} AND confirmed_at < ${period.lt}`,
+      >`SELECT COALESCE(SUM(total_amount), 0)::text AS total FROM orders WHERE status IN ('CONFIRMED', 'COMPLETED') AND stock_deducted_at >= ${period.gte} AND stock_deducted_at < ${period.lt}`,
       this.prisma.$queryRaw<
         Array<{
           productId: string;
@@ -36,7 +36,7 @@ export class DashboardsService {
           unit: string;
           quantity: string;
         }>
-      >`SELECT i.product_id AS "productId", (array_agg(i.snapshot_name ORDER BY o.confirmed_at DESC, i.id DESC))[1] AS name, i.snapshot_unit AS unit, SUM(i.quantity)::text AS quantity FROM order_items i JOIN orders o ON o.id = i.order_id WHERE o.status IN ('CONFIRMED', 'COMPLETED') AND o.confirmed_at >= ${period.gte} AND o.confirmed_at < ${period.lt} GROUP BY i.product_id, i.snapshot_unit ORDER BY SUM(i.quantity) DESC, i.product_id LIMIT 10`,
+      >`SELECT i.product_id AS "productId", (array_agg(i.snapshot_name ORDER BY o.stock_deducted_at DESC, i.id DESC))[1] AS name, i.snapshot_unit AS unit, SUM(i.quantity)::text AS quantity FROM order_items i JOIN orders o ON o.id = i.order_id WHERE o.status IN ('CONFIRMED', 'COMPLETED') AND o.stock_deducted_at >= ${period.gte} AND o.stock_deducted_at < ${period.lt} GROUP BY i.product_id, i.snapshot_unit ORDER BY SUM(i.quantity) DESC, i.product_id LIMIT 10`,
     ]);
     return {
       period: { from: period.gte, to: period.lt },
@@ -54,8 +54,13 @@ export class DashboardsService {
     const [totalProducts, byUnit, low, out, movements] = await Promise.all([
       this.prisma.product.count({ where: { isActive: true } }),
       this.prisma.$queryRaw<
-        Array<{ unit: string; quantity: string }>
-      >`SELECT p.stock_unit AS unit, COALESCE(SUM(b.current_stock), 0)::text AS quantity FROM products p LEFT JOIN inventory_balances b ON b.product_id = p.id WHERE p.is_active = true GROUP BY p.stock_unit ORDER BY p.stock_unit`,
+        Array<{
+          unit: string;
+          quantity: string;
+          reservedQuantity: string;
+          availableQuantity: string;
+        }>
+      >`SELECT p.stock_unit AS unit, COALESCE(SUM(b.current_stock), 0)::text AS quantity, COALESCE(SUM(b.reserved_stock), 0)::text AS "reservedQuantity", COALESCE(SUM(b.current_stock - b.reserved_stock), 0)::text AS "availableQuantity" FROM products p LEFT JOIN inventory_balances b ON b.product_id = p.id WHERE p.is_active = true GROUP BY p.stock_unit ORDER BY p.stock_unit`,
       this.prisma.$queryRaw<
         Array<{ id: string; name: string; quantity: string; unit: string }>
       >`SELECT p.id, p.name, COALESCE(b.current_stock, 0)::text AS quantity, p.stock_unit AS unit FROM products p LEFT JOIN inventory_balances b ON b.product_id = p.id WHERE p.is_active = true AND COALESCE(b.current_stock, 0) < p.minimum_stock ORDER BY p.name, p.id LIMIT 100`,
