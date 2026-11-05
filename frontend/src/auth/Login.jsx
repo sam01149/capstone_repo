@@ -5,10 +5,10 @@ import {
   ArrowLeft,
   AlertCircle,
 } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
-import ForgotPassword from './ForgotPassword';
+import { useAuth } from '../context/AuthContext';
+import LupaPassword from './LupaPassword';
 
-export default function Login({ onBackToCatalog, onLoginSuccess }) {
+export default function Login({ onBackToCatalog, onLoginSuccess, onRequirePasswordChange }) {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,13 +38,23 @@ export default function Login({ onBackToCatalog, onLoginSuccess }) {
 
     setLoading(true);
     try {
-      await login(email, password);
-      // Quick 500ms verification animation before entering dashboard
+      const loggedInUser = await login(email, password);
+
       setTimeout(() => {
-        if (onLoginSuccess) {
-          onLoginSuccess();
+        setLoading(false);
+        // Cek apakah akun memiliki status must_change_password = true
+        if (loggedInUser?.must_change_password) {
+          if (onRequirePasswordChange) {
+            onRequirePasswordChange(loggedInUser);
+          } else if (onLoginSuccess) {
+            onLoginSuccess(loggedInUser);
+          }
+        } else {
+          if (onLoginSuccess) {
+            onLoginSuccess(loggedInUser);
+          }
         }
-      }, 500);
+      }, 400);
     } catch (err) {
       setError(err.message || 'Gagal masuk. Periksa email dan kata sandi Anda.');
       setLoading(false);
@@ -172,32 +182,38 @@ export default function Login({ onBackToCatalog, onLoginSuccess }) {
           {error && (
             <div
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 14px',
+                marginBottom: '20px',
+                padding: '12px 14px',
+                borderRadius: '10px',
                 backgroundColor: '#fef2f2',
                 border: '1px solid #fee2e2',
-                borderRadius: '10px',
-                color: '#dc2626',
-                fontSize: '0.825rem',
-                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
                 textAlign: 'left',
               }}
-              className="animate-fade-in"
             >
-              <AlertCircle size={16} style={{ flexShrink: 0 }} />
-              <span>{error}</span>
+              <AlertCircle size={18} color="#dc2626" style={{ flexShrink: 0 }} />
+              <span
+                style={{
+                  fontSize: '0.85rem',
+                  color: '#b91c1c',
+                  lineHeight: 1.4,
+                }}
+              >
+                {error}
+              </span>
             </div>
           )}
 
-          {/* Login Form */}
+          {/* Form Login */}
           <form onSubmit={handleSubmit} style={{ textAlign: 'left' }}>
-            {/* Input 1: Alamat Email */}
+            {/* Input 1: Alamat Email / Username */}
             <div style={{ marginBottom: '16px' }}>
               <input
                 id="login-email"
-                type="email"
+                type="text"
+                autoComplete="username"
                 required
                 placeholder="Alamat email"
                 value={email}
@@ -230,6 +246,7 @@ export default function Login({ onBackToCatalog, onLoginSuccess }) {
               <input
                 id="login-password"
                 type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
                 required
                 placeholder="Kata sandi"
                 value={password}
@@ -357,11 +374,10 @@ export default function Login({ onBackToCatalog, onLoginSuccess }) {
       </footer>
 
       {/* Modal Pusat Bantuan Lupa Kata Sandi Staf */}
-      <ForgotPassword
+      <LupaPassword
         isOpen={isForgotOpen}
         onClose={() => setIsForgotOpen(false)}
       />
     </div>
   );
 }
-

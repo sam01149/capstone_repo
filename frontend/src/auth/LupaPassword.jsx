@@ -9,7 +9,7 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 
-export default function ForgotPassword({ isOpen, onClose }) {
+export default function LupaPassword({ isOpen, onClose }) {
   const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;

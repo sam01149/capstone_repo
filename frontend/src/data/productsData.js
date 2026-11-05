@@ -1011,11 +1011,12 @@ export function formatRupiah(amount) {
 export function getStoredProducts() {
   try {
     const data = localStorage.getItem(STORAGE_KEY_PRODUCTS);
-    if (!data) {
-      localStorage.setItem(STORAGE_KEY_PRODUCTS, JSON.stringify(PRODUCTS_CATALOG));
-      return PRODUCTS_CATALOG;
-    }
-    return JSON.parse(data);
+    const parsed = data ? JSON.parse(data) : PRODUCTS_CATALOG;
+    if (!Array.isArray(parsed) || parsed.length === 0) return PRODUCTS_CATALOG;
+    return parsed.map((p) => ({
+      ...p,
+      visibility: p.visibility || (p.isAvailable === false ? 'hidden' : 'visible'),
+    }));
   } catch {
     return PRODUCTS_CATALOG;
   }
@@ -1029,6 +1030,20 @@ export function saveStoredProducts(products) {
   } catch (err) {
     console.error('Failed to save products db', err);
   }
+}
+
+// Toggle status visibilitas produk (visible = tampil di publik, hidden = disembunyikan dari publik)
+export function toggleProductVisibility(productId) {
+  const current = getStoredProducts();
+  const updated = current.map((p) => {
+    if (p.id === productId) {
+      const newVis = p.visibility === 'visible' ? 'hidden' : 'visible';
+      return { ...p, visibility: newVis, isAvailable: newVis === 'visible' };
+    }
+    return p;
+  });
+  saveStoredProducts(updated);
+  return updated;
 }
 
 export function calculateCategories(productsList = PRODUCTS_CATALOG) {

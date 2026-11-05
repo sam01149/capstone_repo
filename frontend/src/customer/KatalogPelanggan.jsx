@@ -34,17 +34,25 @@ import {
   User,
   ShoppingCart,
   ShieldCheck,
+  CreditCard,
+  QrCode,
 } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../context/AuthContext';
 import {
   getStoredProducts,
   calculateCategories,
   formatRupiah,
-} from '../../data/productsData';
-import { saveDraftInvoice } from '../../data/ordersAndInventoryData';
-import RoleBadge from '../auth/RoleBadge';
+} from '../data/productsData';
+import {
+  saveDraftInvoice,
+  createSalesOrder,
+  getStoredOrders,
+  submitTransferProof,
+  generateCustomerProofWhatsAppUrl,
+  DUMMY_TRANSFER_PROOFS,
+} from '../data/ordersAndInventoryData';
 
-export default function Catalog({ onOpenLogin, onGoToDashboard }) {
+export default function KatalogPelanggan({ onOpenLogin, onGoToDashboard }) {
   const { isAuthenticated, user, role } = useAuth();
   const [productsList, setProductsList] = useState(getStoredProducts);
   const [searchQuery, setSearchQuery] = useState('');
@@ -54,9 +62,16 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [orderQty, setOrderQty] = useState(1);
   const [invoiceToast, setInvoiceToast] = useState('');
-  const [custName, setCustName] = useState('Ibu Dewi Permata');
-  const [custPhone, setCustPhone] = useState('+62 813-2233-4455');
-  const [custAddress, setCustAddress] = useState('Jl. Dahlia No. 12, Pulo Gebang, Jakarta Timur');
+  const [custName, setCustName] = useState('');
+  const [custPhone, setCustPhone] = useState('');
+  const [custAddress, setCustAddress] = useState('');
+  const [activeDraftNo, setActiveDraftNo] = useState(null);
+
+  // States for Customer QRIS Modal (matching user mockup)
+  const [isCustomerQrModalOpen, setIsCustomerQrModalOpen] = useState(false);
+  const [customerOrders, setCustomerOrders] = useState(getStoredOrders);
+  const [selectedCustOrderId, setSelectedCustOrderId] = useState('');
+  const [custSelectedProofIdx, setCustSelectedProofIdx] = useState(0);
 
   // Real-time synchronization when Super Admin adds/edits products in staff portal
   useEffect(() => {
@@ -67,8 +82,63 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
     return () => window.removeEventListener('farmsight_products_updated', handleProductsUpdate);
   }, []);
 
-  const categoriesList = calculateCategories(productsList);
-  const activeProducts = productsList;
+  // Sinkronisasi data pesanan pelanggan untuk pembayaran QRIS
+  useEffect(() => {
+    const syncOrders = () => {
+      const stored = getStoredOrders();
+      setCustomerOrders(stored);
+      if (stored.length > 0 && !selectedCustOrderId) {
+        setSelectedCustOrderId(stored[0].id);
+      }
+    };
+    syncOrders();
+    window.addEventListener('storage', syncOrders);
+    window.addEventListener('farmsight_orders_updated', syncOrders);
+    return () => {
+      window.removeEventListener('storage', syncOrders);
+      window.removeEventListener('farmsight_orders_updated', syncOrders);
+    };
+  }, [selectedCustOrderId]);
+
+  // Handle URL query ?bayar=ORD-xxx
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const bayarId = params.get('bayar');
+      if (bayarId) {
+        setSelectedCustOrderId(bayarId);
+        setIsCustomerQrModalOpen(true);
+      }
+    }
+  }, []);
+
+  // Submit proof via WhatsApp dari pelanggan
+  const handleCustomerSubmitProof = () => {
+    const targetOrder = customerOrders.find((o) => o.id === selectedCustOrderId);
+    if (!targetOrder) {
+      alert('Silakan pilih nomor pesanan Anda terlebih dahulu.');
+      return;
+    }
+    const sampleProof = DUMMY_TRANSFER_PROOFS[custSelectedProofIdx] || DUMMY_TRANSFER_PROOFS[0];
+    submitTransferProof(
+      targetOrder.id,
+      sampleProof.imageUrl,
+      sampleProof.amount || targetOrder.totalAmount,
+      sampleProof.bank,
+      'Terkirim via WhatsApp Customer'
+    );
+
+    const waUrl = generateCustomerProofWhatsAppUrl(targetOrder, sampleProof);
+    window.open(waUrl, '_blank');
+
+    setIsCustomerQrModalOpen(false);
+    setInvoiceToast(`✓ Bukti transfer (${sampleProof.bank}) berhasil dikirim ke WhatsApp Sales Admin Toko Farm Berkah!`);
+    setTimeout(() => setInvoiceToast(''), 5000);
+  };
+
+  const categoriesList = calculateCategories(productsList.filter((p) => p.visibility !== 'hidden'));
+  // Status Visibilitas: Hanya tampilkan produk yang diset 'visible' oleh Super Admin (produk 'hidden' disembunyikan dari publik)
+  const activeProducts = productsList.filter((p) => p.visibility !== 'hidden');
 
   // Scroll to the very top whenever a product detail view is opened or closed
   useEffect(() => {
@@ -78,6 +148,10 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
   const handleOpenDetail = (product) => {
     setSelectedProduct(product);
     setOrderQty(1);
+    setCustName('');
+    setCustPhone('');
+    setCustAddress('');
+    setActiveDraftNo(null);
     setInvoiceToast('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -154,12 +228,20 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
   });
 
   const handleDownloadDraftInvoice = (product, qty) => {
+    if (!custName.trim() || !custPhone.trim() || !custAddress.trim()) {
+      alert('Silakan lengkapi Data Diri Pembeli (Nama Lengkap, Nomor WhatsApp, dan Alamat Pengiriman) pada formulir terlebih dahulu.');
+      return;
+    }
+
     const quantity = Math.max(1, qty || 1);
     const subtotal = (product.price || 0) * quantity;
     const now = new Date();
     const dateCode = now.toISOString().slice(0, 10).replace(/-/g, '');
     const randCode = Math.floor(100 + Math.random() * 900);
-    const draftInvoiceNo = `DRAFT-INV-${dateCode}-${randCode}`;
+    const draftInvoiceNo = activeDraftNo || `DRAFT-INV-${dateCode}-${randCode}`;
+    if (!activeDraftNo) {
+      setActiveDraftNo(draftInvoiceNo);
+    }
     const dateFormatted = now.toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' });
 
     const draftData = {
@@ -174,9 +256,9 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
       quantity,
       subtotal,
       subtotalFormatted: formatRupiah(subtotal),
-      customerName: custName.trim() || 'Ibu Dewi Permata',
-      customerPhone: custPhone.trim() || '+62 813-2233-4455',
-      customerAddress: custAddress.trim() || 'Jl. Dahlia No. 12, Pulo Gebang, Jakarta Timur',
+      customerName: custName.trim(),
+      customerPhone: custPhone.trim(),
+      customerAddress: custAddress.trim(),
       status: 'DRAFT_DIUNDUH',
       createdAt: now.toISOString(),
     };
@@ -195,9 +277,9 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
       `Status Dokumen  : DRAFT RESMI PEMESANAN`,
       '----------------------------------------------------------------------',
       'DATA PEMESAN (CUSTOMER):',
-      `• Nama Lengkap  : ${custName.trim() || 'Ibu Dewi Permata'}`,
-      `• No. WhatsApp  : ${custPhone.trim() || '+62 813-2233-4455'}`,
-      `• Alamat Kirim  : ${custAddress.trim() || 'Jl. Dahlia No. 12, Pulo Gebang, Jakarta Timur'}`,
+      `• Nama Lengkap  : ${custName.trim()}`,
+      `• No. WhatsApp  : ${custPhone.trim()}`,
+      `• Alamat Kirim  : ${custAddress.trim()}`,
       '----------------------------------------------------------------------',
       'RINCIAN PRODUK PESANAN:',
       `• Nama Produk   : ${product.name}`,
@@ -212,8 +294,8 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
       '',
       'ALUR PEMESANAN & PEMBAYARAN VIA SALES ADMIN:',
       '1. Kirimkan pesan pemesanan ke nomor WhatsApp Toko: 0812-1614-6510.',
-      '2. Sales Admin akan memverifikasi ketersediaan stok fisik di sistem.',
-      '3. Jika stok mencukupi, sistem mereservasi stok dan mengirim QRIS pembayaran.',
+      '2. Sales Admin akan memeriksa ketersediaan stok fisik terlebih dahulu.',
+      '3. Jika stok fisik tersedia, Sales Admin mereservasi stok dan mengirim QRIS resmi.',
       '4. Lakukan transfer sesuai nominal dan kirimkan bukti transfer.',
       '5. Sales Admin mengonfirmasi pembayaran dan pesanan segera diproses.',
       '',
@@ -243,12 +325,20 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
       return;
     }
 
+    if (!custName.trim() || !custPhone.trim() || !custAddress.trim()) {
+      alert('Silakan lengkapi Data Diri Pembeli (Nama Lengkap, Nomor WhatsApp, dan Alamat Pengiriman) pada formulir terlebih dahulu.');
+      return;
+    }
+
     const quantity = Math.max(1, qty || 1);
     const subtotal = (product.price || 0) * quantity;
     const now = new Date();
     const dateCode = now.toISOString().slice(0, 10).replace(/-/g, '');
     const randCode = Math.floor(100 + Math.random() * 900);
-    const draftInvoiceNo = `DRAFT-INV-${dateCode}-${randCode}`;
+    const draftInvoiceNo = activeDraftNo || `DRAFT-INV-${dateCode}-${randCode}`;
+    if (!activeDraftNo) {
+      setActiveDraftNo(draftInvoiceNo);
+    }
 
     // Auto-save draft for Sales Admin inbox
     saveDraftInvoice({
@@ -263,9 +353,9 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
       quantity,
       subtotal,
       subtotalFormatted: formatRupiah(subtotal),
-      customerName: custName.trim() || 'Ibu Dewi Permata',
-      customerPhone: custPhone.trim() || '+62 813-2233-4455',
-      customerAddress: custAddress.trim() || 'Jl. Dahlia No. 12, Pulo Gebang, Jakarta Timur',
+      customerName: custName.trim(),
+      customerPhone: custPhone.trim(),
+      customerAddress: custAddress.trim(),
       status: 'DIKIRIM_VIA_WHATSAPP',
       createdAt: now.toISOString(),
     });
@@ -283,17 +373,36 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
       `• Estimasi Total Pembayaran: ${formatRupiah(subtotal)}`,
       '',
       '👤 Data Diri Pembeli:',
-      `• Nama Lengkap: ${custName.trim() || 'Ibu Dewi Permata'}`,
-      `• Nomor WhatsApp / HP: ${custPhone.trim() || '+62 813-2233-4455'}`,
-      `• Alamat Pengiriman: ${custAddress.trim() || 'Jl. Dahlia No. 12, Pulo Gebang, Jakarta Timur'}`,
+      `• Nama Lengkap: ${custName.trim()}`,
+      `• Nomor WhatsApp / HP: ${custPhone.trim()}`,
+      `• Alamat Pengiriman: ${custAddress.trim()}`,
       '------------------------------------------',
-      'Mohon info verifikasi ketersediaan stok fisik dan QRIS pembayaran ya Toko Farm Berkah. Terima kasih! 🙏',
+      'Mohon dicek ketersediaan stok fisik tokonya ya kak. Terima kasih! 🙏',
     ];
 
     const message = lines.join('\n');
     // Using official api.whatsapp.com endpoint to preserve UTF-8 emojis without browser redirect corruption
     const waUrl = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`;
     window.open(waUrl, '_blank');
+
+    // Auto-create sales order in system so Sales Admin can process it immediately
+    createSalesOrder({
+      customerName: custName.trim(),
+      customerPhone: custPhone.trim(),
+      customerAddress: custAddress.trim(),
+      productId: product.id,
+      quantity,
+      draftInvoiceNo,
+    });
+
+    // Reset formulir pemesanan kembali ke awal agar siap untuk pemesanan berikutnya
+    setOrderQty(1);
+    setCustName('');
+    setCustPhone('');
+    setCustAddress('');
+    setActiveDraftNo(null);
+    setInvoiceToast('✓ Ringkasan pesanan berhasil dikirim ke WhatsApp Sales Admin Toko Farm Berkah! Sales Admin kami akan segera mengecek ketersediaan stok fisik dan membalas pesan WhatsApp Anda.');
+    setTimeout(() => setInvoiceToast(''), 5000);
   };
 
   const formatStockDisplay = (stock, unit, isAvailable) => {
@@ -428,11 +537,44 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
         </div>
 
         {/* Right Navigation & Staff Login */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Tombol Akses Cepat QRIS & Konfirmasi Bukti Transfer Pelanggan (Sesuai Mockup) */}
+          <button
+            type="button"
+            onClick={() => {
+              const orders = getStoredOrders();
+              setCustomerOrders(orders);
+              if (orders.length > 0 && !selectedCustOrderId) {
+                setSelectedCustOrderId(orders[0].id);
+              }
+              setIsCustomerQrModalOpen(true);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              backgroundColor: '#f0fdf4',
+              color: '#15803d',
+              border: '1px solid #bbf7d0',
+              padding: '8px 14px',
+              borderRadius: '30px',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+            title="Buka QRIS Resmi & Kirim Bukti Pembayaran ke WhatsApp Sales Admin"
+          >
+            <CreditCard size={14} />
+            <span>Bayar QRIS & Bukti</span>
+          </button>
+
           {/* Login / Dashboard Button */}
           {isAuthenticated ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <RoleBadge role={role} size="sm" />
+              <span style={{ fontSize: '0.74rem', padding: '4px 10px', borderRadius: '20px', backgroundColor: '#dcfce7', color: '#15803d', fontWeight: 700, border: '1px solid #bbf7d0' }}>
+                Role: {role === 'SUPER_ADMIN' ? 'Super Admin' : role === 'STOCK_MANAGER' ? 'Stock Manager' : 'Sales Admin'}
+              </span>
               <button
                 onClick={onGoToDashboard}
                 style={{
@@ -626,27 +768,33 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
                   {selectedProduct.name}
                 </h1>
 
-                {/* Product Real Image Preview */}
+                {/* Product Real Image Preview - Diperbesar & Tidak Terpotong */}
                 <div
                   style={{
                     width: '100%',
-                    height: '320px',
-                    borderRadius: '14px',
+                    height: '420px',
+                    borderRadius: '16px',
                     overflow: 'hidden',
                     position: 'relative',
-                    marginBottom: '18px',
-                    backgroundColor: '#f1f5f2',
+                    backgroundColor: '#f8faf9',
                     border: '1px solid #d8e2da',
-                    boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.03)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '12px',
                   }}
                 >
                   <img
                     src={selectedProduct.image}
                     alt={selectedProduct.name}
                     style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
+                      maxWidth: '100%',
+                      maxHeight: '100%',
+                      width: 'auto',
+                      height: 'auto',
+                      objectFit: 'contain',
+                      display: 'block',
+                      borderRadius: '10px',
                     }}
                     onError={(e) => {
                       e.target.onerror = null;
@@ -656,104 +804,20 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
                   <div
                     style={{
                       position: 'absolute',
-                      top: '12px',
-                      left: '12px',
+                      top: '14px',
+                      left: '14px',
                       backgroundColor: 'rgba(255, 255, 255, 0.95)',
                       backdropFilter: 'blur(6px)',
-                      padding: '4px 12px',
+                      padding: '5px 14px',
                       borderRadius: '20px',
                       fontSize: '0.75rem',
                       fontWeight: 700,
                       color: selectedProduct.badgeColor || '#1b4332',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                      border: '1px solid rgba(0,0,0,0.06)',
                     }}
                   >
                     {selectedProduct.badge}
-                  </div>
-                </div>
-
-                {/* Price & Stock Tiles in 2-Column Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                  {/* Price Tile */}
-                  <div
-                    style={{
-                      padding: '14px 18px',
-                      backgroundColor: '#f8faf8',
-                      borderRadius: '12px',
-                      border: '1px solid #e1e7e2',
-                    }}
-                  >
-                    <div style={{ fontSize: '0.72rem', color: '#718277', fontWeight: 600 }}>
-                      Harga Satuan
-                    </div>
-                    <div
-                      style={{
-                        fontSize: '1.45rem',
-                        fontWeight: 900,
-                        color: '#1b4332',
-                        marginTop: '2px',
-                        letterSpacing: '-0.01em',
-                      }}
-                    >
-                      {selectedProduct.priceFormatted}
-                    </div>
-                  </div>
-
-                  {/* Stock Status Tile */}
-                  <div
-                    style={{
-                      padding: '14px 18px',
-                      backgroundColor:
-                        selectedProduct.stock === 0
-                          ? '#fef2f2'
-                          : selectedProduct.stock <= selectedProduct.minStock
-                            ? '#fffbeb'
-                            : '#f0f7f2',
-                      borderRadius: '12px',
-                      border: `1px solid ${
-                        selectedProduct.stock === 0
-                          ? '#fecaca'
-                          : selectedProduct.stock <= selectedProduct.minStock
-                            ? '#fef3c7'
-                            : '#d2e7d7'
-                      }`,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                      {selectedProduct.stock === 0 || selectedProduct.isAvailable === false ? (
-                        <XCircle size={15} color="#dc2626" />
-                      ) : selectedProduct.stock <= selectedProduct.minStock ? (
-                        <AlertTriangle size={15} color="#b45309" />
-                      ) : (
-                        <CheckCircle2 size={15} color="#1b4332" />
-                      )}
-                      <span
-                        style={{
-                          fontWeight: 700,
-                          fontSize: '0.8rem',
-                          color:
-                            selectedProduct.stock === 0 || selectedProduct.isAvailable === false
-                              ? '#dc2626'
-                              : selectedProduct.stock <= selectedProduct.minStock
-                                ? '#b45309'
-                                : '#1b4332',
-                        }}
-                      >
-                        {selectedProduct.stock === 0
-                          ? 'Stok Habis'
-                          : selectedProduct.isAvailable === false
-                            ? 'Tidak Tersedia'
-                            : selectedProduct.stock <= selectedProduct.minStock
-                              ? 'Stok Menipis'
-                              : 'Stok Tersedia'}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 800, color: selectedProduct.stock === 0 || selectedProduct.isAvailable === false ? '#dc2626' : '#1b4332' }}>
-                      {formatStockDisplay(selectedProduct.stock, selectedProduct.unit, selectedProduct.isAvailable)}
-                    </div>
                   </div>
                 </div>
               </div>
@@ -814,9 +878,9 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
                 <ol style={{ paddingLeft: '20px', margin: 0, fontSize: '0.82rem', color: '#2d6a4f', lineHeight: 1.7 }}>
                   <li>Tentukan kuantitas pesanan pada formulir di sebelah kanan untuk melihat total tagihan otomatis.</li>
                   <li>Lengkapi nama, nomor WhatsApp, dan alamat pengiriman Anda.</li>
-                  <li>Klik <strong>"Unduh Draft Invoice"</strong> jika Anda memerlukan dokumen ringkasan resmi pemesanan.</li>
+                  <li>Klik <strong>"Unduh Draft Invoice"</strong> untuk menyimpan dokumen ringkasan resmi pemesanan Anda.</li>
                   <li>Klik <strong>"Pesan via WhatsApp"</strong> untuk mengirim rincian draft pesanan langsung ke Sales Admin Toko Farm Berkah.</li>
-                  <li>Sales Admin akan memverifikasi stok fisik toko dan menerbitkan QR Code QRIS pembayaran resmi kepada Anda.</li>
+                  <li>Sales Admin akan memeriksa ketersediaan stok fisik di toko terlebih dahulu. Jika stok tersedia, Sales Admin akan mereservasi stok dan menerbitkan QR Code QRIS pembayaran resmi kepada Anda.</li>
                 </ol>
               </div>
             </div>
@@ -849,6 +913,91 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
                     <p style={{ fontSize: '0.74rem', color: '#64748b', margin: 0 }}>
                       Lengkapi data pesanan untuk dikirim ke WhatsApp toko
                     </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* HARGA SATUAN & STOK TERSEDIA (DITARUH DI ATAS KUANTITAS PESANAN) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                {/* Harga Satuan */}
+                <div
+                  style={{
+                    padding: '12px 14px',
+                    backgroundColor: '#f8faf8',
+                    borderRadius: '12px',
+                    border: '1px solid #e1e7e2',
+                  }}
+                >
+                  <div style={{ fontSize: '0.7rem', color: '#718277', fontWeight: 600 }}>
+                    Harga Satuan
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '1.35rem',
+                      fontWeight: 900,
+                      color: '#1b4332',
+                      marginTop: '2px',
+                      letterSpacing: '-0.01em',
+                    }}
+                  >
+                    {selectedProduct.priceFormatted}
+                  </div>
+                </div>
+
+                {/* Stok Tersedia */}
+                <div
+                  style={{
+                    padding: '12px 14px',
+                    backgroundColor:
+                      selectedProduct.stock === 0
+                        ? '#fef2f2'
+                        : selectedProduct.stock <= selectedProduct.minStock
+                          ? '#fffbeb'
+                          : '#f0f7f2',
+                    borderRadius: '12px',
+                    border: `1px solid ${
+                      selectedProduct.stock === 0
+                        ? '#fecaca'
+                        : selectedProduct.stock <= selectedProduct.minStock
+                          ? '#fef3c7'
+                          : '#d2e7d7'
+                    }`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                    {selectedProduct.stock === 0 || selectedProduct.isAvailable === false ? (
+                      <XCircle size={14} color="#dc2626" />
+                    ) : selectedProduct.stock <= selectedProduct.minStock ? (
+                      <AlertTriangle size={14} color="#b45309" />
+                    ) : (
+                      <CheckCircle2 size={14} color="#1b4332" />
+                    )}
+                    <span
+                      style={{
+                        fontWeight: 700,
+                        fontSize: '0.74rem',
+                        color:
+                          selectedProduct.stock === 0 || selectedProduct.isAvailable === false
+                            ? '#dc2626'
+                            : selectedProduct.stock <= selectedProduct.minStock
+                              ? '#b45309'
+                              : '#1b4332',
+                      }}
+                    >
+                      {selectedProduct.stock === 0
+                        ? 'Stok Habis'
+                        : selectedProduct.isAvailable === false
+                          ? 'Tidak Tersedia'
+                          : selectedProduct.stock <= selectedProduct.minStock
+                            ? 'Stok Menipis'
+                            : 'Stok Tersedia'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 800, color: selectedProduct.stock === 0 || selectedProduct.isAvailable === false ? '#dc2626' : '#1b4332', marginTop: '2px' }}>
+                    {formatStockDisplay(selectedProduct.stock, selectedProduct.unit, selectedProduct.isAvailable)}
                   </div>
                 </div>
               </div>
@@ -981,7 +1130,7 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
                     type="text"
                     value={custName}
                     onChange={(e) => setCustName(e.target.value)}
-                    placeholder="Contoh: Ibu Dewi Permata"
+                    placeholder="Masukkan nama lengkap Anda..."
                     style={{ width: '100%', height: '32px', padding: '0 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', color: '#142019', outline: 'none' }}
                   />
                 </div>
@@ -994,7 +1143,7 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
                     type="text"
                     value={custPhone}
                     onChange={(e) => setCustPhone(e.target.value)}
-                    placeholder="Contoh: +62 813-2233-4455"
+                    placeholder="Contoh: 081234567890"
                     style={{ width: '100%', height: '32px', padding: '0 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', color: '#142019', outline: 'none' }}
                   />
                 </div>
@@ -1007,7 +1156,7 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
                     rows={2}
                     value={custAddress}
                     onChange={(e) => setCustAddress(e.target.value)}
-                    placeholder="Alamat lengkap pengiriman..."
+                    placeholder="Alamat lengkap tujuan pengiriman..."
                     style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', color: '#142019', resize: 'none', outline: 'none' }}
                   />
                 </div>
@@ -1040,7 +1189,40 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
                 const isDetailOutOfStock = !selectedProduct.stock || selectedProduct.stock <= 0 || selectedProduct.isAvailable === false;
                 return (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {/* Tombol 1: Pesan via WhatsApp (Primary) */}
+                    {/* Tombol 1: Unduh Ringkasan Pemesanan / Draft Invoice (Di Atas) */}
+                    <button
+                      type="button"
+                      disabled={isDetailOutOfStock}
+                      onClick={() => !isDetailOutOfStock && handleDownloadDraftInvoice(selectedProduct, orderQty)}
+                      style={{
+                        width: '100%',
+                        padding: '11px 16px',
+                        borderRadius: '10px',
+                        border: isDetailOutOfStock ? '1px solid #e2e8f0' : '1.5px solid #2d6a4f',
+                        backgroundColor: '#ffffff',
+                        color: isDetailOutOfStock ? '#94a3b8' : '#2d6a4f',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                        cursor: isDetailOutOfStock ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        transition: 'all 0.15s',
+                        opacity: isDetailOutOfStock ? 0.6 : 1,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isDetailOutOfStock) e.currentTarget.style.backgroundColor = '#f0fdf4';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isDetailOutOfStock) e.currentTarget.style.backgroundColor = '#ffffff';
+                      }}
+                    >
+                      <Download size={15} />
+                      <span>Unduh Draft Invoice (Ringkasan)</span>
+                    </button>
+
+                    {/* Tombol 2: Pesan via WhatsApp (Di Bawah) */}
                     <button
                       type="button"
                       disabled={isDetailOutOfStock}
@@ -1075,39 +1257,6 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
                       <span>{isDetailOutOfStock ? 'Stok Habis - Tidak Dapat Dipesan' : 'Pesan via WhatsApp'}</span>
                     </button>
 
-                    {/* Tombol 2: Download Ringkasan Pemesanan / Draft Invoice (Secondary) */}
-                    <button
-                      type="button"
-                      disabled={isDetailOutOfStock}
-                      onClick={() => !isDetailOutOfStock && handleDownloadDraftInvoice(selectedProduct, orderQty)}
-                      style={{
-                        width: '100%',
-                        padding: '10px 14px',
-                        borderRadius: '10px',
-                        border: isDetailOutOfStock ? '1px solid #e2e8f0' : '1.5px solid #2d6a4f',
-                        backgroundColor: '#ffffff',
-                        color: isDetailOutOfStock ? '#94a3b8' : '#2d6a4f',
-                        fontSize: '0.82rem',
-                        fontWeight: 700,
-                        cursor: isDetailOutOfStock ? 'not-allowed' : 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '8px',
-                        transition: 'all 0.15s',
-                        opacity: isDetailOutOfStock ? 0.6 : 1,
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isDetailOutOfStock) e.currentTarget.style.backgroundColor = '#f0fdf4';
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isDetailOutOfStock) e.currentTarget.style.backgroundColor = '#ffffff';
-                      }}
-                    >
-                      <Download size={15} />
-                      <span>Unduh Draft Invoice (Ringkasan)</span>
-                    </button>
-
                     <div style={{ fontSize: '0.72rem', color: isDetailOutOfStock ? '#dc2626' : '#718277', textAlign: 'center', marginTop: '2px', fontWeight: isDetailOutOfStock ? 600 : 400 }}>
                       {isDetailOutOfStock
                         ? 'Mohon maaf, produk ini sedang kosong dan belum dapat dipesan.'
@@ -1117,24 +1266,24 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
                 );
               })()}
 
-              {/* Jaminan Layanan UMKM */}
+              {/* Catatan Toko */}
               <div
                 style={{
-                  backgroundColor: '#f0fdf4',
+                  backgroundColor: '#f8fafc',
                   borderRadius: '10px',
-                  border: '1px solid #dcfce7',
-                  padding: '10px 12px',
+                  border: '1px solid #e2e8f0',
+                  padding: '10px 14px',
                   display: 'flex',
                   alignItems: 'flex-start',
                   gap: '8px',
-                  fontSize: '0.72rem',
-                  color: '#166534',
-                  lineHeight: '1.4',
+                  fontSize: '0.74rem',
+                  color: '#475569',
+                  lineHeight: '1.45',
                 }}
               >
-                <ShieldCheck size={16} style={{ color: '#16a34a', flexShrink: 0, marginTop: '1px' }} />
+                <Info size={15} style={{ color: '#0284c7', flexShrink: 0, marginTop: '2px' }} />
                 <span>
-                  <strong>Jaminan Kualitas Toko Farm Berkah:</strong> Stok fisik diperiksa langsung oleh Sales Admin sebelum QRIS diterbitkan demi kenyamanan dan keamanan transaksi Anda.
+                  <strong>Catatan Toko:</strong> Stok fisik produk akan dicek langsung oleh Sales Admin kami di sistem sebelum pembayaran QRIS resmi dikirimkan ke WhatsApp Anda.
                 </span>
               </div>
             </div>
@@ -1847,6 +1996,298 @@ export default function Catalog({ onOpenLogin, onGoToDashboard }) {
           </div>
         </div>
       </footer>
+
+      {/* MODAL PEMBAYARAN QRIS & KONFIRMASI BUKTI TRANSFER (PERSIS SCREENSHOT PENGGUNA) */}
+      {isCustomerQrModalOpen && (() => {
+        const activeOrder = customerOrders.find((o) => o.id === selectedCustOrderId) || customerOrders[0] || {
+          id: 'ORD-2026-333',
+          customerName: 'Pelanggan',
+          customerPhone: '081387140879',
+          productName: 'GORENGAN',
+          quantity: 10,
+          totalAmount: 20000,
+          status: 'MENUNGGU_PEMBAYARAN',
+        };
+        const sampleProof = DUMMY_TRANSFER_PROOFS[custSelectedProofIdx] || DUMMY_TRANSFER_PROOFS[0];
+
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(15, 23, 42, 0.7)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1200,
+              padding: '20px',
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: '#ffffff',
+                borderRadius: '20px',
+                width: '100%',
+                maxWidth: '680px',
+                overflow: 'hidden',
+                boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+                display: 'flex',
+                flexDirection: 'column',
+                border: '1px solid #e1e7e2',
+              }}
+            >
+              {/* Header Modal Hijau Resmi */}
+              <div
+                style={{
+                  backgroundColor: '#1b4332',
+                  color: '#ffffff',
+                  padding: '16px 22px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <img
+                    src="/images/logo-farm-berkah.jpg"
+                    alt="Logo Toko Farm Berkah"
+                    style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'contain', backgroundColor: '#ffffff', padding: '2px' }}
+                  />
+                  <div>
+                    <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, letterSpacing: '-0.01em' }}>
+                      Pembayaran QRIS & Konfirmasi Bukti Transfer
+                    </h3>
+                    <div style={{ fontSize: '0.74rem', opacity: 0.9, marginTop: '2px' }}>
+                      Toko Farm Berkah Official Payment Gateway &bull; NMID: ID1026508798372
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsCustomerQrModalOpen(false)}
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.15)',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '32px',
+                    height: '32px',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1rem',
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Body Modal */}
+              <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '82vh', overflowY: 'auto' }}>
+                {/* Dropdown Pemilihan Pesanan */}
+                <div style={{ backgroundColor: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '0.76rem', fontWeight: 700, color: '#334155' }}>
+                      Pilih Pesanan Anda:
+                    </label>
+                    <span style={{ fontSize: '0.7rem', color: '#15803d', fontWeight: 700 }}>
+                      ✓ Status Sinkron Real-Time
+                    </span>
+                  </div>
+                  {customerOrders.length === 0 ? (
+                    <div style={{ fontSize: '0.78rem', color: '#64748b', fontStyle: 'italic' }}>
+                      Belum ada pesanan aktif. Lakukan pemesanan melalui tombol "Pesan via WhatsApp" terlebih dahulu.
+                    </div>
+                  ) : (
+                    <select
+                      value={selectedCustOrderId || activeOrder.id}
+                      onChange={(e) => setSelectedCustOrderId(e.target.value)}
+                      style={{
+                        width: '100%',
+                        height: '38px',
+                        padding: '0 10px',
+                        borderRadius: '8px',
+                        border: '1.5px solid #cbd5e1',
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        backgroundColor: '#ffffff',
+                        color: '#0f172a',
+                      }}
+                    >
+                      {customerOrders.map((ord) => (
+                        <option key={ord.id} value={ord.id}>
+                          {ord.id} &bull; {ord.customerName} ({ord.productName} &bull; {formatRupiah(ord.totalAmount)}) - Status: {ord.status}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                {/* Ringkasan Tagihan & Status */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '12px' }}>
+                  <div style={{ backgroundColor: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Rincian Tagihan:</div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '2px' }}>
+                      {activeOrder.productName} ({activeOrder.quantity} unit)
+                    </div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 900, color: '#1b4332', marginTop: '4px' }}>
+                      {formatRupiah(activeOrder.totalAmount)}
+                    </div>
+                    <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '4px' }}>
+                      Pemesan: {activeOrder.customerName} ({activeOrder.customerPhone})
+                    </div>
+                  </div>
+
+                  <div style={{ backgroundColor: '#f8fafc', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Status Pembayaran:</div>
+                    <div style={{ marginTop: '4px' }}>
+                      {activeOrder.status === 'SELESAI' || activeOrder.gateway2Status === 'LOLOS' ? (
+                        <span style={{ fontSize: '0.78rem', padding: '5px 10px', borderRadius: '20px', backgroundColor: '#dcfce7', color: '#15803d', fontWeight: 800 }}>
+                          ✓ Lunas Terverifikasi
+                        </span>
+                      ) : activeOrder.status === 'SUDAH_BAYAR' || activeOrder.transferProofImage ? (
+                        <span style={{ fontSize: '0.78rem', padding: '5px 10px', borderRadius: '20px', backgroundColor: '#e0f2fe', color: '#0369a1', fontWeight: 800 }}>
+                          ✓ Bukti Terkirim (Verifikasi)
+                        </span>
+                      ) : activeOrder.status === 'PERLU_TRANSFER_ULANG' ? (
+                        <span style={{ fontSize: '0.78rem', padding: '5px 10px', borderRadius: '20px', backgroundColor: '#fee2e2', color: '#dc2626', fontWeight: 800 }}>
+                          ⚠️ Perlu Transfer Ulang
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '0.78rem', padding: '5px 10px', borderRadius: '20px', backgroundColor: '#fef9c3', color: '#854d0e', fontWeight: 800 }}>
+                          ⏳ Menunggu Pembayaran QRIS
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2 Kolom: QRIS Scan di Kiri & Pilihan Bukti Struk di Kanan */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
+                  {/* Kolom Kiri: Scan QRIS */}
+                  <div style={{ border: '1.5px dashed #86efac', backgroundColor: '#f0fdf4', borderRadius: '14px', padding: '14px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#166534', marginBottom: '8px' }}>
+                      Scan QRIS Toko Farm Berkah
+                    </div>
+                    <div style={{ width: '100%', maxWidth: '200px', borderRadius: '10px', overflow: 'hidden', border: '1px solid #bbf7d0', backgroundColor: '#ffffff', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                      <img
+                        src="/images/qris-farm-berkah.jpg"
+                        alt="QRIS Toko Farm Berkah"
+                        style={{ width: '100%', height: 'auto', display: 'block' }}
+                      />
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#15803d', fontWeight: 700, marginTop: '8px' }}>
+                      NMID: ID1026508798372 &bull; A.n. Toko Farm Berkah
+                    </div>
+                  </div>
+
+                  {/* Kolom Kanan: Pilihan Bukti Struk Transaksi */}
+                  <div style={{ backgroundColor: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0', padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#0f172a' }}>
+                      Kirim Bukti Pembayaran via WhatsApp
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748b', lineHeight: 1.4 }}>
+                      Pilih contoh struk transfer (dummy) atau upload struk Anda, lalu klik tombol kirim.
+                    </div>
+
+                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#334155', marginTop: '4px' }}>
+                      Pilih Sampel Bukti Struk Transaksi:
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                      {DUMMY_TRANSFER_PROOFS.slice(0, 4).map((p, idx) => {
+                        const isSel = custSelectedProofIdx === idx;
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setCustSelectedProofIdx(idx)}
+                            style={{
+                              padding: '8px 10px',
+                              borderRadius: '8px',
+                              border: isSel ? '2px solid #2d6a4f' : '1px solid #cbd5e1',
+                              backgroundColor: isSel ? '#f0fdf4' : '#ffffff',
+                              color: isSel ? '#1b4332' : '#334155',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                            }}
+                          >
+                            <div>{p.bank}</div>
+                            <div style={{ fontSize: '0.68rem', color: isSel ? '#15803d' : '#64748b' }}>
+                              {formatRupiah(activeOrder.totalAmount)}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Tombol Kirim Bukti ke WhatsApp */}
+                    <button
+                      type="button"
+                      onClick={handleCustomerSubmitProof}
+                      style={{
+                        marginTop: 'auto',
+                        padding: '11px 16px',
+                        borderRadius: '10px',
+                        backgroundColor: '#25D366',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontSize: '0.82rem',
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        boxShadow: '0 4px 12px rgba(37, 211, 102, 0.25)',
+                      }}
+                    >
+                      <MessageSquare size={15} />
+                      <span>Kirim Bukti Pembayaran via WhatsApp</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Modal */}
+              <div
+                style={{
+                  backgroundColor: '#f8fafc',
+                  borderTop: '1px solid #e2e8f0',
+                  padding: '12px 22px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <div style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                  WhatsApp Toko Farm Berkah: <strong>0812-1614-6510</strong>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCustomerQrModalOpen(false)}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1',
+                    backgroundColor: '#ffffff',
+                    color: '#475569',
+                    fontSize: '0.78rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

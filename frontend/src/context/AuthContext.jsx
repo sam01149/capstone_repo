@@ -3,6 +3,7 @@ import {
   ROLES,
   ROLE_DETAILS,
   DEFAULT_STAFF_PASSWORD,
+  dummyHashPassword,
   getStoredUsers,
   saveStoredUsers,
   getStoredSession,
@@ -16,25 +17,45 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => getStoredSession());
   const [loading, setLoading] = useState(false);
 
+  // Sync users in real-time across tabs or actions
+  useEffect(() => {
+    const handleSync = () => {
+      setUsers(getStoredUsers());
+      const sess = getStoredSession();
+      if (sess) {
+        const fresh = getStoredUsers().find((u) => u.id === sess.id);
+        if (fresh) setUser(fresh);
+      }
+    };
+    window.addEventListener('storage', handleSync);
+    window.addEventListener('farmsight_users_updated', handleSync);
+    return () => {
+      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('farmsight_users_updated', handleSync);
+    };
+  }, []);
+
   // Save users when state updates
   const updateUsersDb = (updatedList) => {
     setUsers(updatedList);
     saveStoredUsers(updatedList);
   };
 
-  // FR-A-1: Login
-  const login = async (email, password) => {
-    const trimmedEmail = email.trim().toLowerCase();
+  // FR-A-1: Login Staf
+  const login = async (emailOrUsername, password) => {
+    const trimmedInput = (emailOrUsername || '').trim().toLowerCase();
     const foundUser = users.find(
-      (u) => u.email.toLowerCase() === trimmedEmail && u.password === password
+      (u) =>
+        (u.email.toLowerCase() === trimmedInput || u.name.toLowerCase() === trimmedInput) &&
+        u.password === password
     );
 
     if (!foundUser) {
-      throw new Error('Email atau kata sandi tidak valid. Silakan periksa kembali kredensial Anda.');
+      throw new Error('Alamat email/username atau kata sandi tidak valid. Akses ditolak.');
     }
 
     if (foundUser.status !== 'Aktif') {
-      throw new Error('Akun ini sedang dinonaktifkan. Silakan hubungi Super Admin Toko Farm Berkah.');
+      throw new Error('Akun ini dinonaktifkan. Silakan hubungi Super Admin Toko Farm Berkah.');
     }
 
     // Update last login
@@ -68,7 +89,32 @@ export function AuthProvider({ children }) {
     saveStoredSession(null);
   };
 
-  // FR-A-3: Change Password
+  // Alur Wajib Ganti Password (must_change_password = true -> input pw baru -> simpan hash & set must_change_password = false)
+  const completeForceChangePassword = async (newPassword) => {
+    if (!user) throw new Error('Pengguna belum masuk.');
+
+    if (!newPassword || newPassword.length < 8) {
+      throw new Error('Kata sandi baru minimal harus 8 karakter untuk keamanan.');
+    }
+
+    const newHash = dummyHashPassword(newPassword);
+    const updatedUser = {
+      ...user,
+      password: newPassword,
+      passwordHash: newHash,
+      must_change_password: false,
+    };
+
+    const updatedUsers = users.map((u) => (u.id === user.id ? updatedUser : u));
+
+    updateUsersDb(updatedUsers);
+    setUser(updatedUser);
+    saveStoredSession(updatedUser);
+
+    return updatedUser;
+  };
+
+  // FR-A-3: Change Password Reguler
   const changePassword = async (oldPassword, newPassword) => {
     if (!user) throw new Error('Pengguna belum masuk');
 
@@ -80,14 +126,7 @@ export function AuthProvider({ children }) {
       throw new Error('Kata sandi baru minimal harus 8 karakter (NFR-SEC-1).');
     }
 
-    const updatedUser = { ...user, password: newPassword };
-    const updatedUsers = users.map((u) => (u.id === user.id ? updatedUser : u));
-
-    updateUsersDb(updatedUsers);
-    setUser(updatedUser);
-    saveStoredSession(updatedUser);
-
-    return true;
+    return completeForceChangePassword(newPassword);
   };
 
   // FR-A-4: Forgot / Reset Password flow
@@ -103,12 +142,16 @@ export function AuthProvider({ children }) {
       throw new Error('Kata sandi baru minimal harus 8 karakter.');
     }
 
-    const updatedUser = { ...found, password: newPassword };
+    const updatedUser = {
+      ...found,
+      password: newPassword,
+      passwordHash: dummyHashPassword(newPassword),
+      must_change_password: false,
+    };
     const updatedUsers = users.map((u) => (u.id === found.id ? updatedUser : u));
 
     updateUsersDb(updatedUsers);
 
-    // If resetting active user
     if (user && user.id === found.id) {
       setUser(updatedUser);
       saveStoredSession(updatedUser);
@@ -127,7 +170,7 @@ export function AuthProvider({ children }) {
     saveStoredSession(updatedUser);
   };
 
-  // FR-A-5 & FR-A-6: Role Identification & Access Control
+  // Role Identification & Access Control
   const hasPermission = (permission) => {
     if (!user || !user.role) return false;
     const roleConfig = ROLE_DETAILS[user.role];
@@ -140,13 +183,13 @@ export function AuthProvider({ children }) {
     return allowedRoles.includes(user.role);
   };
 
-  // Super Admin User Management Functions (FR-UR-1 to FR-UR-7)
+  // Super Admin: Aksi 1 - Input Data Akun Baru & Role
+  // Sistem buat pw sementara, simpan hash, perbarui database dengan must_change_password = true
   const createUser = async (newUserData) => {
     if (!isRole(ROLES.SUPER_ADMIN)) {
       throw new Error('Hanya Super Admin yang memiliki hak akses untuk menambah pengguna.');
     }
 
-    // Check duplicate email
     if (users.some((u) => u.email.toLowerCase() === newUserData.email.toLowerCase().trim())) {
       throw new Error('Email sudah terdaftar. Gunakan alamat email lain.');
     }
@@ -159,23 +202,29 @@ export function AuthProvider({ children }) {
       .substring(0, 2)
       .toUpperCase();
 
+    // Buat kata sandi sementara otomatis jika tidak diisi manual
+    const tempPassword = newUserData.password?.trim() || `farmTemp-${Math.floor(1000 + Math.random() * 9000)}`;
+    const tempHash = dummyHashPassword(tempPassword);
+
     const newUser = {
       id: newId,
-      name: newUserData.name,
+      name: newUserData.name.trim(),
       email: newUserData.email.trim().toLowerCase(),
-      password: newUserData.password || 'farm12345',
-      role: newUserData.role || ROLES.STOCK_MANAGER,
-      roleTitle: newUserData.roleTitle || 'Staff Operasional',
+      password: tempPassword,
+      passwordHash: tempHash,
+      role: newUserData.role || ROLES.SALES_ADMIN,
+      roleTitle: newUserData.roleTitle || (newUserData.role === ROLES.STOCK_MANAGER ? 'Staff Gudang & Stok' : 'Staff Operasional Penjualan'),
       phone: newUserData.phone || '-',
       avatar: initials,
       status: 'Aktif',
+      must_change_password: true, // Wajib ganti saat login pertama kali
       lastLogin: '-',
       createdAt: new Date().toISOString().split('T')[0],
     };
 
     const updated = [...users, newUser];
     updateUsersDb(updated);
-    return newUser;
+    return { newUser, tempPassword };
   };
 
   const updateUser = async (userId, data) => {
@@ -201,7 +250,6 @@ export function AuthProvider({ children }) {
     const target = users.find((u) => u.id === userId);
     if (!target) return;
 
-    // Prevent deactivating own account
     if (user && user.id === userId) {
       throw new Error('Anda tidak dapat menonaktifkan akun yang sedang aktif digunakan.');
     }
@@ -211,14 +259,32 @@ export function AuthProvider({ children }) {
     updateUsersDb(updated);
   };
 
-  const adminResetUserPassword = async (userId, newPassword) => {
+  // Super Admin: Aksi 2 - Reset Password pada Akun Staff
+  // Sistem buat pw sementara, simpan hash, perbarui database dengan must_change_password = true
+  const adminResetUserPassword = async (userId, customTempPassword) => {
     if (!isRole(ROLES.SUPER_ADMIN)) {
       throw new Error('Akses ditolak: Hanya Super Admin yang memiliki wewenang mereset kata sandi staf.');
     }
-    const finalPassword = newPassword && newPassword.trim() ? newPassword.trim() : DEFAULT_STAFF_PASSWORD;
-    const updated = users.map((u) => (u.id === userId ? { ...u, password: finalPassword } : u));
+
+    const target = users.find((u) => u.id === userId);
+    if (!target) throw new Error('Pengguna tidak ditemukan.');
+
+    const tempPassword = customTempPassword && customTempPassword.trim()
+      ? customTempPassword.trim()
+      : `farmReset-${Math.floor(1000 + Math.random() * 9000)}`;
+    const tempHash = dummyHashPassword(tempPassword);
+
+    const updatedUser = {
+      ...target,
+      password: tempPassword,
+      passwordHash: tempHash,
+      must_change_password: true, // Wajib ganti password pada login berikutnya
+    };
+
+    const updated = users.map((u) => (u.id === userId ? updatedUser : u));
     updateUsersDb(updated);
-    return finalPassword;
+
+    return { updatedUser, tempPassword };
   };
 
   const value = {
@@ -232,6 +298,7 @@ export function AuthProvider({ children }) {
     login,
     quickLogin,
     logout,
+    completeForceChangePassword,
     changePassword,
     resetPasswordByEmail,
     updateProfile,

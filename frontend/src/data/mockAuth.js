@@ -9,6 +9,18 @@ export const ROLES = {
 
 export const DEFAULT_STAFF_PASSWORD = 'farm12345';
 
+// Dummy Password Hasher (Simulasi Hash SHA-256 untuk Frontend Capstone)
+export function dummyHashPassword(plainPassword) {
+  if (!plainPassword) return 'hash_dummy_empty';
+  let hash = 0;
+  for (let i = 0; i < plainPassword.length; i++) {
+    const char = plainPassword.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash |= 0; // Convert to 32bit integer
+  }
+  return `sha256_${Math.abs(hash).toString(16).padStart(8, '0')}_${btoa(plainPassword).slice(0, 10)}`;
+}
+
 export const ROLE_DETAILS = {
   [ROLES.SUPER_ADMIN]: {
     id: ROLES.SUPER_ADMIN,
@@ -83,11 +95,13 @@ export const INITIAL_ACCOUNTS = [
     name: 'Ibu Intan Permatasari',
     email: 'admin@farmberkah.com',
     password: 'admin12345',
+    passwordHash: dummyHashPassword('admin12345'),
     role: ROLES.SUPER_ADMIN,
     roleTitle: 'Pemilik Toko Farm Berkah',
     phone: '+62 812-1614-6510',
     avatar: 'IP',
     status: 'Aktif',
+    must_change_password: false,
     lastLogin: '2026-10-09 15:30',
     createdAt: '2024-01-15',
   },
@@ -96,11 +110,13 @@ export const INITIAL_ACCOUNTS = [
     name: 'Budi Santoso',
     email: 'stock@farmberkah.com',
     password: 'stock12345',
+    passwordHash: dummyHashPassword('stock12345'),
     role: ROLES.STOCK_MANAGER,
     roleTitle: 'Koordinator Gudang & Persediaan',
     phone: '+62 813-9876-5432',
     avatar: 'BS',
     status: 'Aktif',
+    must_change_password: false,
     lastLogin: '2026-10-09 14:15',
     createdAt: '2024-03-10',
   },
@@ -109,19 +125,36 @@ export const INITIAL_ACCOUNTS = [
     name: 'Siti Rahmawati',
     email: 'sales@farmberkah.com',
     password: 'sales12345',
+    passwordHash: dummyHashPassword('sales12345'),
     role: ROLES.SALES_ADMIN,
     roleTitle: 'Staff Operasional Penjualan',
     phone: '+62 857-1122-3344',
     avatar: 'SR',
     status: 'Aktif',
+    must_change_password: false,
     lastLogin: '2026-10-09 16:05',
     createdAt: '2024-04-01',
+  },
+  {
+    id: 'usr-004',
+    name: 'Rian Pratama (Staff Uji Coba)',
+    email: 'stafbaru@farmberkah.com',
+    password: 'farmTemp-2026',
+    passwordHash: dummyHashPassword('farmTemp-2026'),
+    role: ROLES.SALES_ADMIN,
+    roleTitle: 'Staff Penjualan Baru',
+    phone: '+62 812-9988-7766',
+    avatar: 'RP',
+    status: 'Aktif',
+    must_change_password: true, // Akun demonstrasi untuk menguji pop-up ganti password pertama kali
+    lastLogin: '-',
+    createdAt: '2026-11-05',
   },
 ];
 
 // Helper functions for LocalStorage mock database
-const STORAGE_KEY_USERS = 'farmsight_users_db_v1';
-const STORAGE_KEY_SESSION = 'farmsight_active_session_v1';
+const STORAGE_KEY_USERS = 'farmsight_users_db_v2';
+const STORAGE_KEY_SESSION = 'farmsight_active_session_v2';
 
 export function getStoredUsers() {
   try {
@@ -130,7 +163,13 @@ export function getStoredUsers() {
       localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(INITIAL_ACCOUNTS));
       return INITIAL_ACCOUNTS;
     }
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    if (!Array.isArray(parsed) || parsed.length === 0) return INITIAL_ACCOUNTS;
+    return parsed.map((u) => ({
+      ...u,
+      must_change_password: Boolean(u.must_change_password),
+      passwordHash: u.passwordHash || dummyHashPassword(u.password || 'farm12345'),
+    }));
   } catch {
     return INITIAL_ACCOUNTS;
   }
@@ -139,6 +178,7 @@ export function getStoredUsers() {
 export function saveStoredUsers(users) {
   try {
     localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(users));
+    window.dispatchEvent(new Event('farmsight_users_updated'));
   } catch (err) {
     console.error('Failed to save users', err);
   }
