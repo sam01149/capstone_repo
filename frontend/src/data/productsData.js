@@ -88,7 +88,7 @@ export const PRODUCTS_CATALOG = [
     categorySlug: 'bibit_pupuk',
     price: 10000,
     priceFormatted: 'Rp 10.000',
-    stock: 25,
+    stock: 0,
     minStock: 10,
     unit: '1 POLIBAG',
     rating: 4.8,
@@ -985,7 +985,7 @@ export const PRODUCTS_CATALOG = [
     categorySlug: 'bibit_pupuk',
     price: 5000,
     priceFormatted: 'Rp 5.000',
-    stock: 25,
+    stock: 0,
     minStock: 15,
     unit: '100 GR',
     rating: 4.7,
@@ -997,12 +997,12 @@ export const PRODUCTS_CATALOG = [
     description: 'Pupuk nitrogen tunggal untuk mempercepat pertumbuhan vegetatif daun tanaman agar hijau subur.',
     composition: 'Nitrogen 46% Prill.',
     shelfLife: 'Tahan Lama',
-    isAvailable: true,
+    isAvailable: false,
   },
 ];
 
 // LocalStorage Mock Database for Products
-export const STORAGE_KEY_PRODUCTS = 'farmsight_products_db_v1';
+export const STORAGE_KEY_PRODUCTS = 'farmsight_products_db_v2';
 
 export function formatRupiah(amount) {
   return `Rp ${Number(amount).toLocaleString('id-ID')}`;
@@ -1032,14 +1032,13 @@ export function saveStoredProducts(products) {
 }
 
 export function calculateCategories(productsList = PRODUCTS_CATALOG) {
-  const activeProducts = productsList.filter((p) => p.isAvailable !== false);
   return [
-    { id: 'all', name: 'Semua Produk', icon: 'Sparkles', count: activeProducts.length },
-    { id: 'camilan', name: 'Camilan & Keripik', icon: 'Wheat', count: activeProducts.filter((p) => p.categorySlug === 'camilan').length },
-    { id: 'olahan', name: 'Olahan Permen & Cokelat', icon: 'Leaf', count: activeProducts.filter((p) => p.categorySlug === 'olahan').length },
-    { id: 'minuman', name: 'Minuman Segar & Teh', icon: 'CupSoda', count: activeProducts.filter((p) => p.categorySlug === 'minuman').length },
-    { id: 'sayur', name: 'Sayuran & Panen Segar', icon: 'Carrot', count: activeProducts.filter((p) => p.categorySlug === 'sayur').length },
-    { id: 'bibit_pupuk', name: 'Bibit & Sarana Tanam', icon: 'Sprout', count: activeProducts.filter((p) => p.categorySlug === 'bibit_pupuk').length },
+    { id: 'all', name: 'Semua Produk', icon: 'Sparkles', count: productsList.length },
+    { id: 'camilan', name: 'Camilan & Keripik', icon: 'Wheat', count: productsList.filter((p) => p.categorySlug === 'camilan').length },
+    { id: 'olahan', name: 'Olahan Permen & Cokelat', icon: 'Leaf', count: productsList.filter((p) => p.categorySlug === 'olahan').length },
+    { id: 'minuman', name: 'Minuman Segar & Teh', icon: 'CupSoda', count: productsList.filter((p) => p.categorySlug === 'minuman').length },
+    { id: 'sayur', name: 'Sayuran & Panen Segar', icon: 'Carrot', count: productsList.filter((p) => p.categorySlug === 'sayur').length },
+    { id: 'bibit_pupuk', name: 'Bibit & Sarana Tanam', icon: 'Sprout', count: productsList.filter((p) => p.categorySlug === 'bibit_pupuk').length },
   ];
 }
 

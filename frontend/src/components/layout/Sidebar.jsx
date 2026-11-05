@@ -11,12 +11,13 @@ import {
   FileBarChart,
   Lock,
   ChevronRight,
+  LogOut,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { ROLES } from '../../data/mockAuth';
 
-export default function Sidebar({ activeTab, onSelectTab }) {
-  const { role, isRole } = useAuth();
+export default function Sidebar({ activeTab, onSelectTab, onLogout }) {
+  const { role, isRole, logout } = useAuth();
 
   const menuItems = [
     {
@@ -172,23 +173,62 @@ export default function Sidebar({ activeTab, onSelectTab }) {
         </nav>
       </div>
 
-      {/* Role Access Scope Info Card at bottom of sidebar */}
-      <div
-        style={{
-          padding: '12px',
-          backgroundColor: '#f6f9f6',
-          borderRadius: '12px',
-          border: '1px solid #e1e7e2',
-        }}
-      >
-        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1b4332', textTransform: 'uppercase', marginBottom: '4px' }}>
-          Otorisasi & Keamanan
+      {/* Role Access Scope Info Card & Logout at bottom of sidebar */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div
+          style={{
+            padding: '12px',
+            backgroundColor: '#f6f9f6',
+            borderRadius: '12px',
+            border: '1px solid #e1e7e2',
+          }}
+        >
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1b4332', textTransform: 'uppercase', marginBottom: '4px' }}>
+            Otorisasi & Keamanan
+          </div>
+          <div style={{ fontSize: '0.75rem', color: '#48564e', lineHeight: 1.4 }}>
+            {role === ROLES.SUPER_ADMIN && 'Hak akses penuh ke data master, pengguna, forecasting, dan stok.'}
+            {role === ROLES.STOCK_MANAGER && 'Akses fokus persediaan, stock movement, & rekomendasi pengadaan.'}
+            {role === ROLES.SALES_ADMIN && 'Akses fokus penerimaan pesanan & validasi ketersediaan stok.'}
+          </div>
         </div>
-        <div style={{ fontSize: '0.75rem', color: '#48564e', lineHeight: 1.4 }}>
-          {role === ROLES.SUPER_ADMIN && 'Hak akses penuh ke data master, pengguna, forecasting, dan stok.'}
-          {role === ROLES.STOCK_MANAGER && 'Akses fokus persediaan, stock movement, & rekomendasi pengadaan.'}
-          {role === ROLES.SALES_ADMIN && 'Akses fokus penerimaan pesanan & validasi ketersediaan stok.'}
-        </div>
+
+        <button
+          onClick={() => {
+            if (onLogout) {
+              onLogout();
+            } else {
+              logout();
+            }
+          }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            padding: '9px 12px',
+            borderRadius: '10px',
+            border: '1px solid #fecaca',
+            backgroundColor: '#fff',
+            color: '#dc2626',
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#fef2f2';
+            e.currentTarget.style.borderColor = '#f87171';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#fff';
+            e.currentTarget.style.borderColor = '#fecaca';
+          }}
+          title="Keluar dari sistem dan kembali ke katalog publik"
+        >
+          <LogOut size={15} />
+          <span>Keluar (Logout)</span>
+        </button>
       </div>
     </aside>
   );

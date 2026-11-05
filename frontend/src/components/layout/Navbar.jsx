@@ -18,7 +18,7 @@ import { ROLES, ROLE_DETAILS } from '../../data/mockAuth';
 import RoleBadge from '../auth/RoleBadge';
 import ChangePassword from '../auth/ChangePassword';
 
-export default function Navbar({ onViewCatalog }) {
+export default function Navbar({ onViewCatalog, onLogout }) {
   const { user, role, logout } = useAuth();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
@@ -318,7 +318,12 @@ export default function Navbar({ onViewCatalog }) {
                   <button
                     onClick={() => {
                       setShowProfileMenu(false);
-                      logout();
+                      if (onLogout) {
+                        onLogout();
+                      } else {
+                        logout();
+                        if (onViewCatalog) onViewCatalog();
+                      }
                     }}
                     style={{
                       display: 'flex',

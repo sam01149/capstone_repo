@@ -38,7 +38,7 @@ const CATEGORY_OPTIONS = [
   { slug: 'bibit_pupuk', name: 'Bibit & Sarana Tanam', badge: 'Sarana Tani', color: '#1e40af', bg: '#dbeafe' },
 ];
 
-export default function ProductManagementView({ onBackToDashboard }) {
+export default function Products({ onBackToDashboard }) {
   const { isRole } = useAuth();
   const [products, setProducts] = useState(getStoredProducts);
   const [searchQuery, setSearchQuery] = useState('');

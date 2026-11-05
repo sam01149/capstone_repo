@@ -7,6 +7,8 @@ export const ROLES = {
   SALES_ADMIN: 'SALES_ADMIN',
 };
 
+export const DEFAULT_STAFF_PASSWORD = 'farm12345';
+
 export const ROLE_DETAILS = {
   [ROLES.SUPER_ADMIN]: {
     id: ROLES.SUPER_ADMIN,
@@ -83,7 +85,7 @@ export const INITIAL_ACCOUNTS = [
     password: 'admin12345',
     role: ROLES.SUPER_ADMIN,
     roleTitle: 'Pemilik Toko Farm Berkah',
-    phone: '+62 813-1000-3455',
+    phone: '+62 812-1614-6510',
     avatar: 'IP',
     status: 'Aktif',
     lastLogin: '2026-10-09 15:30',

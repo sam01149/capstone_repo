@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Users,
   UserPlus,
   Shield,
   Search,
@@ -15,18 +14,25 @@ import {
   Calendar,
   Clock,
   Check,
+  Copy,
+  Eye,
+  EyeOff,
+  MessageCircle,
+  Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { ROLES, ROLE_DETAILS } from '../../data/mockAuth';
 import RoleBadge from '../auth/RoleBadge';
 
-export default function UserManagementView() {
+export default function Users() {
   const {
     users,
     createUser,
     updateUser,
     toggleUserStatus,
     adminResetUserPassword,
+    defaultPassword = 'farm12345',
     user: currentUser,
   } = useAuth();
 
@@ -35,7 +41,12 @@ export default function UserManagementView() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isResetPassModalOpen, setIsResetPassModalOpen] = useState(false);
   const [selectedUserForReset, setSelectedUserForReset] = useState(null);
+  const [resetMode, setResetMode] = useState('DEFAULT'); // 'DEFAULT' or 'CUSTOM'
   const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const [resetSuccessData, setResetSuccessData] = useState(null);
+  const [isCopiedCredential, setIsCopiedCredential] = useState(false);
+  const [resetError, setResetError] = useState('');
   const [feedbackMsg, setFeedbackMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -102,23 +113,56 @@ export default function UserManagementView() {
     }
   };
 
+  const openResetModal = (targetUser) => {
+    setSelectedUserForReset(targetUser);
+    setResetMode('DEFAULT');
+    setNewAdminPassword(defaultPassword);
+    setShowAdminPassword(false);
+    setResetSuccessData(null);
+    setIsCopiedCredential(false);
+    setResetError('');
+    setIsResetPassModalOpen(true);
+  };
+
+  const handleGeneratePassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    let res = 'Farm#';
+    for (let i = 0; i < 4; i++) {
+      res += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setNewAdminPassword(res);
+  };
+
   const handleResetPasswordSubmit = async (e) => {
     e.preventDefault();
+    setResetError('');
     if (!selectedUserForReset) return;
-    if (newAdminPassword.length < 8) {
-      alert('Kata sandi baru minimal 8 karakter');
+
+    const passwordToSet = resetMode === 'DEFAULT' ? defaultPassword : newAdminPassword.trim();
+
+    if (!passwordToSet || passwordToSet.length < 8) {
+      setResetError('Kata sandi baru minimal harus 8 karakter.');
       return;
     }
 
     try {
-      await adminResetUserPassword(selectedUserForReset.id, newAdminPassword);
-      setIsResetPassModalOpen(false);
-      setSelectedUserForReset(null);
-      setNewAdminPassword('');
+      await adminResetUserPassword(selectedUserForReset.id, passwordToSet);
+      setResetSuccessData({
+        user: selectedUserForReset,
+        password: passwordToSet,
+        mode: resetMode,
+      });
       showFeedback(`Kata sandi untuk ${selectedUserForReset.name} berhasil diatur ulang.`);
     } catch (err) {
-      alert(err.message);
+      setResetError(err.message || 'Gagal mengatur ulang kata sandi');
     }
+  };
+
+  const handleCopyCredential = (userData, pwd) => {
+    const text = `Halo ${userData.name}, berikut kredensial baru akun staf FarmSight Anda (Toko Farm Berkah):\n\nEmail: ${userData.email}\nKata Sandi: ${pwd}\n\nSilakan segera login di aplikasi web FarmSight.`;
+    navigator.clipboard.writeText(text);
+    setIsCopiedCredential(true);
+    setTimeout(() => setIsCopiedCredential(false), 2500);
   };
 
   const handleRoleChangeDirect = async (userId, targetRole) => {
@@ -425,10 +469,7 @@ export default function UserManagementView() {
                       <td style={{ padding: '14px 18px', textAlign: 'right' }}>
                         <div style={{ display: 'inline-flex', gap: '6px' }}>
                           <button
-                            onClick={() => {
-                              setSelectedUserForReset(u);
-                              setIsResetPassModalOpen(true);
-                            }}
+                            onClick={() => openResetModal(u)}
                             style={{
                               padding: '5px 8px',
                               borderRadius: '6px',
@@ -678,7 +719,7 @@ export default function UserManagementView() {
         </div>
       )}
 
-      {/* Modal: Reset Password Pengguna */}
+      {/* Modal: Reset Password Pengguna oleh Super Admin */}
       {isResetPassModalOpen && selectedUserForReset && (
         <div
           style={{
@@ -702,60 +743,454 @@ export default function UserManagementView() {
           <div
             style={{
               background: '#ffffff',
-              borderRadius: '16px',
+              borderRadius: '20px',
               width: '100%',
-              maxWidth: '420px',
-              padding: '24px',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15)',
+              maxWidth: '480px',
+              padding: '26px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
               position: 'relative',
+              border: '1px solid #e1e7e2',
             }}
             className="animate-fade-in"
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#fef3c7', color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <KeyRound size={20} />
-              </div>
-              <div>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#142019' }}>
-                  Reset Kata Sandi
+            {/* Close Button */}
+            <button
+              onClick={() => setIsResetPassModalOpen(false)}
+              style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+                background: '#f4f6f4',
+                border: 'none',
+                borderRadius: '50%',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#718277',
+              }}
+            >
+              <X size={18} />
+            </button>
+
+            {resetSuccessData ? (
+              /* Success View After Reset */
+              <div style={{ textAlign: 'center', padding: '10px 4px 6px 4px' }} className="animate-fade-in">
+                <div
+                  style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '50%',
+                    backgroundColor: '#dcfce7',
+                    color: '#16a34a',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 16px auto',
+                    border: '1px solid #bbf7d0',
+                  }}
+                >
+                  <CheckCircle2 size={36} />
+                </div>
+
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#142019', marginBottom: '6px' }}>
+                  Kata Sandi Berhasil Diatur Ulang!
                 </h3>
-                <p style={{ fontSize: '0.75rem', color: '#718277' }}>
-                  Akun: <strong>{selectedUserForReset.email}</strong>
+                <p style={{ fontSize: '0.825rem', color: '#64748b', marginBottom: '20px', lineHeight: 1.5 }}>
+                  Akun staf <strong>{resetSuccessData.user.name}</strong> kini dapat diakses kembali menggunakan kredensial berikut:
                 </p>
-              </div>
-            </div>
 
-            <form onSubmit={handleResetPasswordSubmit}>
-              <div style={{ marginBottom: '18px' }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#142019', marginBottom: '4px' }}>
-                  Kata Sandi Baru
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Min. 8 karakter (misal: farm2026!)"
-                  value={newAdminPassword}
-                  onChange={(e) => setNewAdminPassword(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #d1d9d3', fontSize: '0.9rem' }}
-                />
-              </div>
+                {/* Credential Card */}
+                <div
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    border: '1.5px dashed #cbd5e1',
+                    borderRadius: '14px',
+                    padding: '16px',
+                    textAlign: 'left',
+                    marginBottom: '20px',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                      Email Akun:
+                    </span>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0f172a' }}>
+                      {resetSuccessData.user.email}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                      Kata Sandi Baru:
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '0.95rem',
+                        fontWeight: 700,
+                        color: '#1b4332',
+                        backgroundColor: '#d8f3dc',
+                        padding: '3px 10px',
+                        borderRadius: '6px',
+                        fontFamily: 'monospace',
+                        letterSpacing: '0.05em',
+                      }}
+                    >
+                      {resetSuccessData.password}
+                    </span>
+                  </div>
+                </div>
 
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => setIsResetPassModalOpen(false)}
-                  style={{ flex: 1, padding: '9px', borderRadius: '8px', border: '1px solid #d1d9d3', background: '#fff', color: '#48564e', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  style={{ flex: 1.5, padding: '9px', borderRadius: '8px', border: 'none', background: '#2d6a4f', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  Setel Ulang
-                </button>
+                {/* Actions */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyCredential(resetSuccessData.user, resetSuccessData.password)}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '10px',
+                      backgroundColor: isCopiedCredential ? '#16a34a' : '#1b4332',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      transition: 'background-color 0.15s',
+                    }}
+                  >
+                    {isCopiedCredential ? <Check size={18} /> : <Copy size={18} />}
+                    <span>{isCopiedCredential ? 'Format Kredensial Tersalin!' : 'Salin Kredensial Staf'}</span>
+                  </button>
+
+                  {resetSuccessData.user.phone && resetSuccessData.user.phone !== '-' && (
+                    <a
+                      href={`https://wa.me/${resetSuccessData.user.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                        `Halo ${resetSuccessData.user.name}, berikut kata sandi baru untuk akun FarmSight Anda di Toko Farm Berkah:\n\nEmail: ${resetSuccessData.user.email}\nKata Sandi: ${resetSuccessData.password}\n\nSilakan segera login di aplikasi web.`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        width: '100%',
+                        padding: '11px',
+                        borderRadius: '10px',
+                        backgroundColor: '#25D366',
+                        color: '#ffffff',
+                        textDecoration: 'none',
+                        fontSize: '0.85rem',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                      }}
+                    >
+                      <MessageCircle size={18} />
+                      <span>Kirim ke WhatsApp Staf ({resetSuccessData.user.phone})</span>
+                    </a>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsResetPassModalOpen(false);
+                      setResetSuccessData(null);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '10px',
+                      backgroundColor: '#f1f5f9',
+                      border: 'none',
+                      color: '#475569',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Selesai
+                  </button>
+                </div>
               </div>
-            </form>
+            ) : (
+              /* Reset Password Form */
+              <div>
+                {/* Modal Header */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                  <div
+                    style={{
+                      width: '46px',
+                      height: '46px',
+                      borderRadius: '12px',
+                      backgroundColor: '#d8f3dc',
+                      color: '#1b4332',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <KeyRound size={24} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#142019', margin: 0 }}>
+                      Reset Kata Sandi Staf
+                    </h3>
+                    <p style={{ fontSize: '0.78rem', color: '#718277', margin: '2px 0 0 0' }}>
+                      Kendali Otorisasi Akun oleh Super Admin
+                    </p>
+                  </div>
+                </div>
+
+                {/* Target User Info Badge */}
+                <div
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    padding: '12px 14px',
+                    marginBottom: '18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div
+                      style={{
+                        width: '34px',
+                        height: '34px',
+                        borderRadius: '50%',
+                        backgroundColor: '#1b4332',
+                        color: '#fff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 700,
+                        fontSize: '0.78rem',
+                      }}
+                    >
+                      {selectedUserForReset.avatar}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>
+                        {selectedUserForReset.name}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                        {selectedUserForReset.email}
+                      </div>
+                    </div>
+                  </div>
+                  <RoleBadge role={selectedUserForReset.role} />
+                </div>
+
+                {resetError && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '10px 14px',
+                      backgroundColor: '#fef2f2',
+                      border: '1px solid #fee2e2',
+                      borderRadius: '10px',
+                      color: '#dc2626',
+                      fontSize: '0.825rem',
+                      marginBottom: '16px',
+                    }}
+                    className="animate-fade-in"
+                  >
+                    <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                    <span>{resetError}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleResetPasswordSubmit}>
+                  {/* Mode Selector */}
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#142019', marginBottom: '8px' }}>
+                    Pilih Metode Reset:
+                  </label>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '18px' }}>
+                    {/* Option 1: Default Password */}
+                    <div
+                      onClick={() => setResetMode('DEFAULT')}
+                      style={{
+                        border: `1.5px solid ${resetMode === 'DEFAULT' ? '#2d6a4f' : '#e2e8f0'}`,
+                        backgroundColor: resetMode === 'DEFAULT' ? '#f0fdf4' : '#ffffff',
+                        borderRadius: '12px',
+                        padding: '12px 14px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <input
+                            type="radio"
+                            name="resetMode"
+                            checked={resetMode === 'DEFAULT'}
+                            onChange={() => setResetMode('DEFAULT')}
+                            style={{ accentColor: '#2d6a4f', cursor: 'pointer' }}
+                          />
+                          <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#142019' }}>
+                            Kembalikan ke Kata Sandi Default
+                          </span>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            color: '#1b4332',
+                            backgroundColor: '#d8f3dc',
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            fontFamily: 'monospace',
+                          }}
+                        >
+                          {defaultPassword}
+                        </span>
+                      </div>
+                      <p style={{ fontSize: '0.76rem', color: '#64748b', margin: '4px 0 0 24px', lineHeight: 1.4 }}>
+                        Sandi akan langsung direset ke nilai standar sistem (<strong>{defaultPassword}</strong>).
+                      </p>
+                    </div>
+
+                    {/* Option 2: Custom / Isi Ulang Sendiri */}
+                    <div
+                      onClick={() => setResetMode('CUSTOM')}
+                      style={{
+                        border: `1.5px solid ${resetMode === 'CUSTOM' ? '#2d6a4f' : '#e2e8f0'}`,
+                        backgroundColor: resetMode === 'CUSTOM' ? '#f0fdf4' : '#ffffff',
+                        borderRadius: '12px',
+                        padding: '12px 14px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="radio"
+                          name="resetMode"
+                          checked={resetMode === 'CUSTOM'}
+                          onChange={() => setResetMode('CUSTOM')}
+                          style={{ accentColor: '#2d6a4f', cursor: 'pointer' }}
+                        />
+                        <span style={{ fontSize: '0.875rem', fontWeight: 700, color: '#142019' }}>
+                          Tentukan Kata Sandi Baru (Isi Ulang Sendiri)
+                        </span>
+                      </div>
+                      <p style={{ fontSize: '0.76rem', color: '#64748b', margin: '4px 0 0 24px', lineHeight: 1.4 }}>
+                        Super Admin dapat mengetikkan kata sandi baru secara khusus untuk staf.
+                      </p>
+
+                      {resetMode === 'CUSTOM' && (
+                        <div style={{ marginTop: '12px', marginLeft: '24px' }} onClick={(e) => e.stopPropagation()}>
+                          <div style={{ position: 'relative', marginBottom: '8px' }}>
+                            <input
+                              type={showAdminPassword ? 'text' : 'password'}
+                              required={resetMode === 'CUSTOM'}
+                              placeholder="Minimal 8 karakter"
+                              value={newAdminPassword}
+                              onChange={(e) => setNewAdminPassword(e.target.value)}
+                              style={{
+                                width: '100%',
+                                height: '42px',
+                                padding: '0 40px 0 12px',
+                                borderRadius: '8px',
+                                border: '1px solid #cbd5e1',
+                                fontSize: '0.875rem',
+                                outline: 'none',
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowAdminPassword(!showAdminPassword)}
+                              style={{
+                                position: 'absolute',
+                                right: '10px',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                background: 'none',
+                                border: 'none',
+                                color: '#94a3b8',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {showAdminPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleGeneratePassword}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '5px 10px',
+                              borderRadius: '6px',
+                              backgroundColor: '#e2e8f0',
+                              border: 'none',
+                              color: '#334155',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <Sparkles size={13} color="#2d6a4f" />
+                            <span>Acak Sandi Aman Otomatis</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Dialog Buttons */}
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '22px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setIsResetPassModalOpen(false)}
+                      style={{
+                        flex: 1,
+                        padding: '11px',
+                        borderRadius: '10px',
+                        border: '1px solid #cbd5e1',
+                        backgroundColor: '#ffffff',
+                        color: '#475569',
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      style={{
+                        flex: 1.5,
+                        padding: '11px',
+                        borderRadius: '10px',
+                        border: 'none',
+                        backgroundColor: '#1b4332',
+                        color: '#ffffff',
+                        fontSize: '0.875rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 10px rgba(27, 67, 50, 0.25)',
+                      }}
+                    >
+                      Setel Ulang Sekarang
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
           </div>
         </div>
       )}

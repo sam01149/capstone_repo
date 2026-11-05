@@ -18,7 +18,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { ROLES, ROLE_DETAILS } from '../../data/mockAuth';
 
-export default function OverviewDashboard({ onNavigate }) {
+export default function Dashboard({ onNavigate }) {
   const { user, role } = useAuth();
   const [activeDashboardView, setActiveDashboardView] = useState('all'); // 'all', 'inventory', 'sales'
 

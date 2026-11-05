@@ -1,21 +1,48 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ROLES } from './data/mockAuth';
-import PublicCatalog from './components/public/PublicCatalog';
-import LoginForm from './components/auth/LoginForm';
+import Catalog from './components/public/Catalog';
+import Login from './components/auth/Login';
 import Navbar from './components/layout/Navbar';
 import Sidebar from './components/layout/Sidebar';
 import AccessDenied from './components/layout/AccessDenied';
-import OverviewDashboard from './components/dashboard/OverviewDashboard';
-import UserManagementView from './components/users/UserManagementView';
-import ProductManagementView from './components/products/ProductManagementView';
-import ModulePreview from './components/modules/ModulePreview';
+import Dashboard from './components/dashboard/Dashboard';
+import Users from './components/users/Users';
+import Products from './components/products/Products';
+import Operations from './components/modules/Operations';
 
 function MainApp() {
-  const { isAuthenticated, loading, role, isRole } = useAuth();
-  // Current view modes: 'catalog' (public default), 'login' (staff auth), 'dashboard' (internal ops)
-  const [currentView, setCurrentView] = useState('catalog');
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const { isAuthenticated, loading, isRole, logout } = useAuth();
+  
+  // Persist currentView: if authenticated, stay on dashboard; if not, show catalog
+  const [currentView, setCurrentView] = useState(() => {
+    const saved = localStorage.getItem('farmsight_current_view');
+    if (saved && (saved === 'catalog' || saved === 'login' || saved === 'dashboard')) {
+      return saved;
+    }
+    return isAuthenticated ? 'dashboard' : 'catalog';
+  });
+
+  // Persist active operational tab (e.g. 'orders' for Sales Admin)
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('farmsight_active_tab') || 'orders';
+  });
+
+  const handleSetCurrentView = (view) => {
+    setCurrentView(view);
+    localStorage.setItem('farmsight_current_view', view);
+  };
+
+  const handleSelectTab = (tab) => {
+    setActiveTab(tab);
+    localStorage.setItem('farmsight_active_tab', tab);
+  };
+
+  const handleStaffLogout = () => {
+    logout();
+    handleSetCurrentView('catalog');
+    handleSelectTab('dashboard');
+  };
 
   if (loading) {
     return (
@@ -37,11 +64,22 @@ function MainApp() {
   }
 
   // 1. Default Public Catalog View (FR-PP-1 s/d FR-PP-5)
-  if (currentView === 'catalog') {
+  // Shown when user explicitly navigates to catalog or when not authenticated and on catalog
+  if (currentView === 'catalog' && !isAuthenticated) {
     return (
-      <PublicCatalog
-        onOpenLogin={() => setCurrentView('login')}
-        onGoToDashboard={() => setCurrentView('dashboard')}
+      <Catalog
+        onOpenLogin={() => handleSetCurrentView('login')}
+        onGoToDashboard={() => handleSetCurrentView('dashboard')}
+      />
+    );
+  }
+
+  // Allow authenticated staff to view public catalog, with a quick return to dashboard
+  if (currentView === 'catalog' && isAuthenticated) {
+    return (
+      <Catalog
+        onOpenLogin={() => handleSetCurrentView('login')}
+        onGoToDashboard={() => handleSetCurrentView('dashboard')}
       />
     );
   }
@@ -49,9 +87,12 @@ function MainApp() {
   // 2. Internal Staff Login View (FR-A-1)
   if (currentView === 'login' || !isAuthenticated) {
     return (
-      <LoginForm
-        onBackToCatalog={() => setCurrentView('catalog')}
-        onLoginSuccess={() => setCurrentView('dashboard')}
+      <Login
+        onBackToCatalog={() => handleSetCurrentView('catalog')}
+        onLoginSuccess={() => {
+          handleSetCurrentView('dashboard');
+          handleSelectTab('orders');
+        }}
       />
     );
   }
@@ -60,27 +101,27 @@ function MainApp() {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <OverviewDashboard onNavigate={setActiveTab} />;
+        return <Dashboard onNavigate={handleSelectTab} />;
 
       case 'products':
-        return <ProductManagementView onBackToDashboard={() => setActiveTab('dashboard')} />;
+        return <Products onBackToDashboard={() => handleSelectTab('dashboard')} />;
 
       case 'users':
         if (!isRole(ROLES.SUPER_ADMIN)) {
           return (
             <AccessDenied
               featureName="Manajemen Pengguna & Otorisasi Sistem"
-              onBackToDashboard={() => setActiveTab('dashboard')}
+              onBackToDashboard={() => handleSelectTab('dashboard')}
             />
           );
         }
-        return <UserManagementView />;
+        return <Users />;
 
       default:
         return (
-          <ModulePreview
+          <Operations
             tabId={activeTab}
-            onBackToDashboard={() => setActiveTab('dashboard')}
+            onBackToDashboard={() => handleSelectTab('dashboard')}
           />
         );
     }
@@ -88,9 +129,16 @@ function MainApp() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#f4f6f4' }}>
-      <Navbar onViewCatalog={() => setCurrentView('catalog')} />
+      <Navbar
+        onViewCatalog={() => handleSetCurrentView('catalog')}
+        onLogout={handleStaffLogout}
+      />
       <div style={{ display: 'flex', flex: 1 }}>
-        <Sidebar activeTab={activeTab} onSelectTab={setActiveTab} />
+        <Sidebar
+          activeTab={activeTab}
+          onSelectTab={handleSelectTab}
+          onLogout={handleStaffLogout}
+        />
         <main style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
           {renderContent()}
         </main>

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   ROLES,
   ROLE_DETAILS,
+  DEFAULT_STAFF_PASSWORD,
   getStoredUsers,
   saveStoredUsers,
   getStoredSession,
@@ -12,16 +13,8 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [users, setUsers] = useState(getStoredUsers);
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  // Initialize app without auto-login so every visit starts fresh on public catalog
-  useEffect(() => {
-    // Clear any previous persistent session on fresh page loads
-    saveStoredSession(null);
-    setUser(null);
-    setLoading(false);
-  }, []);
+  const [user, setUser] = useState(() => getStoredSession());
+  const [loading, setLoading] = useState(false);
 
   // Save users when state updates
   const updateUsersDb = (updatedList) => {
@@ -220,10 +213,12 @@ export function AuthProvider({ children }) {
 
   const adminResetUserPassword = async (userId, newPassword) => {
     if (!isRole(ROLES.SUPER_ADMIN)) {
-      throw new Error('Akses ditolak');
+      throw new Error('Akses ditolak: Hanya Super Admin yang memiliki wewenang mereset kata sandi staf.');
     }
-    const updated = users.map((u) => (u.id === userId ? { ...u, password: newPassword } : u));
+    const finalPassword = newPassword && newPassword.trim() ? newPassword.trim() : DEFAULT_STAFF_PASSWORD;
+    const updated = users.map((u) => (u.id === userId ? { ...u, password: finalPassword } : u));
     updateUsersDb(updated);
+    return finalPassword;
   };
 
   const value = {
@@ -233,6 +228,7 @@ export function AuthProvider({ children }) {
     isAuthenticated: !!user,
     loading,
     users,
+    defaultPassword: DEFAULT_STAFF_PASSWORD,
     login,
     quickLogin,
     logout,

@@ -27,15 +27,24 @@ import {
   Tag,
   ArrowRight,
   ArrowLeft,
+  Download,
+  Minus,
+  Plus,
+  FileText,
+  User,
+  ShoppingCart,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import {
   getStoredProducts,
   calculateCategories,
+  formatRupiah,
 } from '../../data/productsData';
+import { saveDraftInvoice } from '../../data/ordersAndInventoryData';
 import RoleBadge from '../auth/RoleBadge';
 
-export default function PublicCatalog({ onOpenLogin, onGoToDashboard }) {
+export default function Catalog({ onOpenLogin, onGoToDashboard }) {
   const { isAuthenticated, user, role } = useAuth();
   const [productsList, setProductsList] = useState(getStoredProducts);
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,6 +52,11 @@ export default function PublicCatalog({ onOpenLogin, onGoToDashboard }) {
   const [stockFilter, setStockFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('POPULAR');
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [orderQty, setOrderQty] = useState(1);
+  const [invoiceToast, setInvoiceToast] = useState('');
+  const [custName, setCustName] = useState('Ibu Dewi Permata');
+  const [custPhone, setCustPhone] = useState('+62 813-2233-4455');
+  const [custAddress, setCustAddress] = useState('Jl. Dahlia No. 12, Pulo Gebang, Jakarta Timur');
 
   // Real-time synchronization when Super Admin adds/edits products in staff portal
   useEffect(() => {
@@ -54,7 +68,7 @@ export default function PublicCatalog({ onOpenLogin, onGoToDashboard }) {
   }, []);
 
   const categoriesList = calculateCategories(productsList);
-  const activeProducts = productsList.filter((p) => p.isAvailable !== false);
+  const activeProducts = productsList;
 
   // Scroll to the very top whenever a product detail view is opened or closed
   useEffect(() => {
@@ -63,6 +77,8 @@ export default function PublicCatalog({ onOpenLogin, onGoToDashboard }) {
 
   const handleOpenDetail = (product) => {
     setSelectedProduct(product);
+    setOrderQty(1);
+    setInvoiceToast('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -125,9 +141,9 @@ export default function PublicCatalog({ onOpenLogin, onGoToDashboard }) {
 
     const matchStock =
       stockFilter === 'ALL' ||
-      (stockFilter === 'AVAILABLE' && item.stock > item.minStock) ||
-      (stockFilter === 'LIMITED' && item.stock > 0 && item.stock <= item.minStock) ||
-      (stockFilter === 'OUT' && item.stock === 0);
+      (stockFilter === 'AVAILABLE' && item.stock > item.minStock && item.isAvailable !== false) ||
+      (stockFilter === 'LIMITED' && item.stock > 0 && item.stock <= item.minStock && item.isAvailable !== false) ||
+      (stockFilter === 'OUT' && (item.stock === 0 || item.isAvailable === false));
 
     return matchSearch && matchCat && matchStock;
   }).sort((a, b) => {
@@ -137,25 +153,141 @@ export default function PublicCatalog({ onOpenLogin, onGoToDashboard }) {
     return b.soldCount - a.soldCount; // Default POPULAR
   });
 
-  const handleWhatsAppOrder = (product) => {
-    const phone = '6281310003455';
+  const handleDownloadDraftInvoice = (product, qty) => {
+    const quantity = Math.max(1, qty || 1);
+    const subtotal = (product.price || 0) * quantity;
+    const now = new Date();
+    const dateCode = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const randCode = Math.floor(100 + Math.random() * 900);
+    const draftInvoiceNo = `DRAFT-INV-${dateCode}-${randCode}`;
+    const dateFormatted = now.toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' });
+
+    const draftData = {
+      invoiceNo: draftInvoiceNo,
+      date: dateFormatted,
+      productId: product.id,
+      productName: product.name,
+      category: product.category,
+      unit: product.unit,
+      price: product.price,
+      priceFormatted: product.priceFormatted,
+      quantity,
+      subtotal,
+      subtotalFormatted: formatRupiah(subtotal),
+      customerName: custName.trim() || 'Ibu Dewi Permata',
+      customerPhone: custPhone.trim() || '+62 813-2233-4455',
+      customerAddress: custAddress.trim() || 'Jl. Dahlia No. 12, Pulo Gebang, Jakarta Timur',
+      status: 'DRAFT_DIUNDUH',
+      createdAt: now.toISOString(),
+    };
+
+    // Save to shared localStorage so Sales Admin can immediately see it in Dashboard
+    saveDraftInvoice(draftData);
+
+    // Create printable text invoice
+    const invoiceContent = [
+      '======================================================================',
+      '                    UMKM TOKO FARM BERKAH - PULO GEBANG',
+      '                     RINGKASAN PEMESANAN / DRAFT INVOICE',
+      '======================================================================',
+      `No. Dokumen     : ${draftInvoiceNo}`,
+      `Tanggal         : ${dateFormatted}`,
+      `Status Dokumen  : DRAFT RESMI PEMESANAN`,
+      '----------------------------------------------------------------------',
+      'DATA PEMESAN (CUSTOMER):',
+      `• Nama Lengkap  : ${custName.trim() || 'Ibu Dewi Permata'}`,
+      `• No. WhatsApp  : ${custPhone.trim() || '+62 813-2233-4455'}`,
+      `• Alamat Kirim  : ${custAddress.trim() || 'Jl. Dahlia No. 12, Pulo Gebang, Jakarta Timur'}`,
+      '----------------------------------------------------------------------',
+      'RINCIAN PRODUK PESANAN:',
+      `• Nama Produk   : ${product.name}`,
+      `• Kode SKU      : ${product.id}`,
+      `• Kategori      : ${product.category}`,
+      `• Kemasan Satuan: ${product.unit}`,
+      `• Harga Satuan  : ${product.priceFormatted}`,
+      `• Kuantitas     : ${quantity}`,
+      '----------------------------------------------------------------------',
+      `ESTIMASI TOTAL PEMBAYARAN : ${formatRupiah(subtotal)}`,
+      '======================================================================',
+      '',
+      'ALUR PEMESANAN & PEMBAYARAN VIA SALES ADMIN:',
+      '1. Kirimkan pesan pemesanan ke nomor WhatsApp Toko: 0812-1614-6510.',
+      '2. Sales Admin akan memverifikasi ketersediaan stok fisik di sistem.',
+      '3. Jika stok mencukupi, sistem mereservasi stok dan mengirim QRIS pembayaran.',
+      '4. Lakukan transfer sesuai nominal dan kirimkan bukti transfer.',
+      '5. Sales Admin mengonfirmasi pembayaran dan pesanan segera diproses.',
+      '',
+      'Alamat Toko: Komplek Masnaga, Pulo Gebang, Jakarta Timur',
+      'WhatsApp Resmi: 0812-1614-6510 | Email: admin@farmberkah.com',
+      '======================================================================',
+    ].join('\n');
+
+    const blob = new Blob([invoiceContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Draft-Invoice-${product.name.replace(/\s+/g, '-')}-${draftInvoiceNo}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    setInvoiceToast(`Draft Invoice ${draftInvoiceNo} berhasil diunduh!`);
+    setTimeout(() => setInvoiceToast(''), 4500);
+    return draftInvoiceNo;
+  };
+
+  const handleWhatsAppOrder = (product, qty) => {
+    if (!product || !product.stock || product.stock <= 0 || product.isAvailable === false) {
+      alert(`Mohon maaf, produk "${product?.name || 'ini'}" saat ini sedang habis atau tidak tersedia sehingga belum dapat dipesan.`);
+      return;
+    }
+
+    const quantity = Math.max(1, qty || 1);
+    const subtotal = (product.price || 0) * quantity;
+    const now = new Date();
+    const dateCode = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const randCode = Math.floor(100 + Math.random() * 900);
+    const draftInvoiceNo = `DRAFT-INV-${dateCode}-${randCode}`;
+
+    // Auto-save draft for Sales Admin inbox
+    saveDraftInvoice({
+      invoiceNo: draftInvoiceNo,
+      date: now.toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' }),
+      productId: product.id,
+      productName: product.name,
+      category: product.category,
+      unit: product.unit,
+      price: product.price,
+      priceFormatted: product.priceFormatted,
+      quantity,
+      subtotal,
+      subtotalFormatted: formatRupiah(subtotal),
+      customerName: custName.trim() || 'Ibu Dewi Permata',
+      customerPhone: custPhone.trim() || '+62 813-2233-4455',
+      customerAddress: custAddress.trim() || 'Jl. Dahlia No. 12, Pulo Gebang, Jakarta Timur',
+      status: 'DIKIRIM_VIA_WHATSAPP',
+      createdAt: now.toISOString(),
+    });
+
+    const phone = '6281216146510';
     const lines = [
       'PEMESANAN - TOKO FARM BERKAH',
       '------------------------------------------',
+      `📄 No. Draft Invoice: ${draftInvoiceNo}`,
       '📦 Rincian Produk:',
       `• Nama Produk: ${product.name}`,
       `• Kemasan / Satuan: ${product.unit}`,
       `• Harga Satuan: ${product.priceFormatted}`,
-      '• Jumlah Pesanan: 1 (silakan sesuaikan)',
+      `• Kuantitas Pesanan: ${quantity}`,
+      `• Estimasi Total Pembayaran: ${formatRupiah(subtotal)}`,
       '',
       '👤 Data Diri Pembeli:',
-      '• Nama Lengkap: ',
-      '• Nomor WhatsApp / HP: ',
-      '• Alamat Email: ',
-      '• Alamat Pengiriman: ',
-      '• Catatan Tambahan (opsional): ',
+      `• Nama Lengkap: ${custName.trim() || 'Ibu Dewi Permata'}`,
+      `• Nomor WhatsApp / HP: ${custPhone.trim() || '+62 813-2233-4455'}`,
+      `• Alamat Pengiriman: ${custAddress.trim() || 'Jl. Dahlia No. 12, Pulo Gebang, Jakarta Timur'}`,
       '------------------------------------------',
-      'Mohon info total pembayaran ya Toko Farm Berkah. Terima kasih! 🙏',
+      'Mohon info verifikasi ketersediaan stok fisik dan QRIS pembayaran ya Toko Farm Berkah. Terima kasih! 🙏',
     ];
 
     const message = lines.join('\n');
@@ -164,8 +296,9 @@ export default function PublicCatalog({ onOpenLogin, onGoToDashboard }) {
     window.open(waUrl, '_blank');
   };
 
-  const formatStockDisplay = (stock, unit) => {
-    if (!stock || stock === 0) return 'Pre-Order';
+  const formatStockDisplay = (stock, unit, isAvailable) => {
+    if (isAvailable === false) return 'Tidak Tersedia';
+    if (!stock || stock === 0) return 'Stok Habis';
     const u = (unit || '').trim();
     const uUpper = u.toUpperCase();
     if (uUpper === 'PCS' || uUpper === 'KG' || uUpper === 'BOTOL' || uUpper === 'POLYBAG' || uUpper === 'PACK' || uUpper === 'CUP') {
@@ -416,285 +549,248 @@ export default function PublicCatalog({ onOpenLogin, onGoToDashboard }) {
             </div>
           </div>
 
-          {/* 2-Column Full Width Layout */}
+          {/* 2-Column Balanced Layout */}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '360px 1fr',
-              gap: '28px',
+              gridTemplateColumns: 'minmax(0, 1.25fr) minmax(380px, 450px)',
+              gap: '24px',
               alignItems: 'start',
               width: '100%',
             }}
           >
-            {/* Left Column: Visual Showcase, Price, Stock & WhatsApp */}
-            <div
-              style={{
-                backgroundColor: '#ffffff',
-                borderRadius: '16px',
-                border: '1px solid #e1e7e2',
-                padding: '22px',
-                boxShadow: 'var(--shadow-sm)',
-              }}
-            >
-              {/* Product Real Image Preview */}
-              <div
-                style={{
-                  width: '100%',
-                  height: '240px',
-                  borderRadius: '14px',
-                  overflow: 'hidden',
-                  position: 'relative',
-                  marginBottom: '16px',
-                  backgroundColor: '#f1f5f2',
-                  border: '1px solid #d8e2da',
-                  boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.03)',
-                }}
-              >
-                <img
-                  src={selectedProduct.image}
-                  alt={selectedProduct.name}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                  }}
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80';
-                  }}
-                />
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '12px',
-                    left: '12px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    backdropFilter: 'blur(6px)',
-                    padding: '4px 12px',
-                    borderRadius: '20px',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    color: selectedProduct.badgeColor || '#1b4332',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
-                  }}
-                >
-                  {selectedProduct.badge}
-                </div>
-              </div>
-
-              {/* Price Box */}
-              <div
-                style={{
-                  padding: '12px 16px',
-                  backgroundColor: '#f8faf8',
-                  borderRadius: '10px',
-                  border: '1px solid #e1e7e2',
-                  marginBottom: '12px',
-                }}
-              >
-                <div style={{ fontSize: '0.72rem', color: '#718277', fontWeight: 600 }}>
-                  Harga Satuan
-                </div>
-                <div
-                  style={{
-                    fontSize: '1.35rem',
-                    fontWeight: 800,
-                    color: '#1b4332',
-                    marginTop: '2px',
-                    letterSpacing: '-0.01em',
-                  }}
-                >
-                  {selectedProduct.priceFormatted}
-                </div>
-              </div>
-
-              {/* Stock Status */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '10px 14px',
-                  backgroundColor:
-                    selectedProduct.stock === 0
-                      ? '#fef2f2'
-                      : selectedProduct.stock <= selectedProduct.minStock
-                        ? '#fffbeb'
-                        : '#f0f7f2',
-                  borderRadius: '10px',
-                  border: `1px solid ${selectedProduct.stock === 0
-                      ? '#fecaca'
-                      : selectedProduct.stock <= selectedProduct.minStock
-                        ? '#fef3c7'
-                        : '#d2e7d7'
-                    }`,
-                  marginBottom: '16px',
-                  fontSize: '0.78rem',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {selectedProduct.stock === 0 ? (
-                    <XCircle size={15} color="#dc2626" />
-                  ) : selectedProduct.stock <= selectedProduct.minStock ? (
-                    <AlertTriangle size={15} color="#b45309" />
-                  ) : (
-                    <CheckCircle2 size={15} color="#1b4332" />
-                  )}
-                  <span
-                    style={{
-                      fontWeight: 600,
-                      color:
-                        selectedProduct.stock === 0
-                          ? '#dc2626'
-                          : selectedProduct.stock <= selectedProduct.minStock
-                            ? '#b45309'
-                            : '#1b4332',
-                    }}
-                  >
-                    {selectedProduct.stock === 0
-                      ? 'Habis'
-                      : selectedProduct.stock <= selectedProduct.minStock
-                        ? 'Stok Menipis'
-                        : 'Tersedia'}
-                  </span>
-                </div>
-                <strong style={{ color: selectedProduct.stock === 0 ? '#dc2626' : '#1b4332', fontSize: '0.825rem' }}>
-                  {formatStockDisplay(selectedProduct.stock, selectedProduct.unit)}
-                </strong>
-              </div>
-
-              {/* WhatsApp CTA Button */}
-              <button
-                onClick={() => handleWhatsAppOrder(selectedProduct)}
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  borderRadius: '10px',
-                  border: 'none',
-                  backgroundColor: '#2d6a4f',
-                  color: '#ffffff',
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  boxShadow: '0 3px 8px rgba(45, 106, 79, 0.25)',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#1b4332';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#2d6a4f';
-                }}
-              >
-                <MessageSquare size={16} />
-                <span>Pesan via WhatsApp</span>
-              </button>
-              <div style={{ fontSize: '0.72rem', color: '#718277', textAlign: 'center', marginTop: '8px' }}>
-                WhatsApp Toko: <strong>0813-1000-3455</strong>
-              </div>
-            </div>
-
-            {/* Right Column: Full Product Information */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {/* Product Title Card */}
+            {/* Left Column: Visual Showcase, Pricing, Description, Ingredients, & Flow Info */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {/* Card 1: Product Header, Image Showcase & Price/Stock */}
               <div
                 style={{
                   backgroundColor: '#ffffff',
                   borderRadius: '16px',
                   border: '1px solid #e1e7e2',
-                  padding: '20px 24px',
+                  padding: '24px',
                   boxShadow: 'var(--shadow-sm)',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                  <span
+                {/* Header Meta: Category, SKU, Rating, Location */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span
+                      style={{
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        backgroundColor: '#edf7f0',
+                        color: '#1b4332',
+                        padding: '3px 10px',
+                        borderRadius: '12px',
+                      }}
+                    >
+                      {selectedProduct.category}
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: '#718277' }}>
+                      SKU: <strong>{selectedProduct.id}</strong>
+                    </span>
+                  </div>
+
+                  <div
                     style={{
-                      fontSize: '0.72rem',
-                      fontWeight: 700,
-                      backgroundColor: '#edf7f0',
-                      color: '#1b4332',
-                      padding: '3px 10px',
-                      borderRadius: '12px',
+                      fontSize: '0.8rem',
+                      color: '#718277',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      flexWrap: 'wrap',
                     }}
                   >
-                    {selectedProduct.category}
-                  </span>
-                  <span style={{ fontSize: '0.75rem', color: '#718277' }}>
-                    SKU: <strong>{selectedProduct.id}</strong>
-                  </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Star size={13} color="#eab308" fill="#eab308" />
+                      <strong style={{ color: '#142019' }}>{selectedProduct.rating}</strong>
+                      <span>({selectedProduct.reviews} Ulasan)</span>
+                    </div>
+                    <span>&bull;</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <MapPin size={13} color="#2d6a4f" />
+                      <span>Pulo Gebang, Jakarta Timur</span>
+                    </div>
+                  </div>
                 </div>
 
                 <h1
                   style={{
-                    fontSize: '1.35rem',
+                    fontSize: '1.45rem',
                     fontWeight: 800,
                     color: '#142019',
-                    marginBottom: '8px',
+                    marginBottom: '16px',
                     lineHeight: 1.3,
                   }}
                 >
                   {selectedProduct.name}
                 </h1>
 
+                {/* Product Real Image Preview */}
                 <div
                   style={{
-                    fontSize: '0.8rem',
-                    color: '#718277',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    flexWrap: 'wrap',
+                    width: '100%',
+                    height: '320px',
+                    borderRadius: '14px',
+                    overflow: 'hidden',
+                    position: 'relative',
+                    marginBottom: '18px',
+                    backgroundColor: '#f1f5f2',
+                    border: '1px solid #d8e2da',
+                    boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.03)',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Star size={13} color="#eab308" fill="#eab308" />
-                    <strong style={{ color: '#142019' }}>{selectedProduct.rating}</strong>
-                    <span>({selectedProduct.reviews} Ulasan)</span>
+                  <img
+                    src={selectedProduct.image}
+                    alt={selectedProduct.name}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                    }}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80';
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '12px',
+                      left: '12px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      backdropFilter: 'blur(6px)',
+                      padding: '4px 12px',
+                      borderRadius: '20px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      color: selectedProduct.badgeColor || '#1b4332',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
+                    }}
+                  >
+                    {selectedProduct.badge}
                   </div>
-                  <span>&bull;</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <MapPin size={13} color="#2d6a4f" />
-                    <span>Pulo Gebang, Jakarta Timur</span>
+                </div>
+
+                {/* Price & Stock Tiles in 2-Column Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  {/* Price Tile */}
+                  <div
+                    style={{
+                      padding: '14px 18px',
+                      backgroundColor: '#f8faf8',
+                      borderRadius: '12px',
+                      border: '1px solid #e1e7e2',
+                    }}
+                  >
+                    <div style={{ fontSize: '0.72rem', color: '#718277', fontWeight: 600 }}>
+                      Harga Satuan
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '1.45rem',
+                        fontWeight: 900,
+                        color: '#1b4332',
+                        marginTop: '2px',
+                        letterSpacing: '-0.01em',
+                      }}
+                    >
+                      {selectedProduct.priceFormatted}
+                    </div>
+                  </div>
+
+                  {/* Stock Status Tile */}
+                  <div
+                    style={{
+                      padding: '14px 18px',
+                      backgroundColor:
+                        selectedProduct.stock === 0
+                          ? '#fef2f2'
+                          : selectedProduct.stock <= selectedProduct.minStock
+                            ? '#fffbeb'
+                            : '#f0f7f2',
+                      borderRadius: '12px',
+                      border: `1px solid ${
+                        selectedProduct.stock === 0
+                          ? '#fecaca'
+                          : selectedProduct.stock <= selectedProduct.minStock
+                            ? '#fef3c7'
+                            : '#d2e7d7'
+                      }`,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                      {selectedProduct.stock === 0 || selectedProduct.isAvailable === false ? (
+                        <XCircle size={15} color="#dc2626" />
+                      ) : selectedProduct.stock <= selectedProduct.minStock ? (
+                        <AlertTriangle size={15} color="#b45309" />
+                      ) : (
+                        <CheckCircle2 size={15} color="#1b4332" />
+                      )}
+                      <span
+                        style={{
+                          fontWeight: 700,
+                          fontSize: '0.8rem',
+                          color:
+                            selectedProduct.stock === 0 || selectedProduct.isAvailable === false
+                              ? '#dc2626'
+                              : selectedProduct.stock <= selectedProduct.minStock
+                                ? '#b45309'
+                                : '#1b4332',
+                        }}
+                      >
+                        {selectedProduct.stock === 0
+                          ? 'Stok Habis'
+                          : selectedProduct.isAvailable === false
+                            ? 'Tidak Tersedia'
+                            : selectedProduct.stock <= selectedProduct.minStock
+                              ? 'Stok Menipis'
+                              : 'Stok Tersedia'}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 800, color: selectedProduct.stock === 0 || selectedProduct.isAvailable === false ? '#dc2626' : '#1b4332' }}>
+                      {formatStockDisplay(selectedProduct.stock, selectedProduct.unit, selectedProduct.isAvailable)}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Description & Ingredients */}
+              {/* Card 2: Description & Ingredients */}
               <div
                 style={{
                   backgroundColor: '#ffffff',
                   borderRadius: '16px',
                   border: '1px solid #e1e7e2',
-                  padding: '20px 24px',
+                  padding: '22px 24px',
                   boxShadow: 'var(--shadow-sm)',
                 }}
               >
                 <div style={{ marginBottom: '16px' }}>
-                  <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#142019', marginBottom: '6px' }}>
+                  <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#142019', marginBottom: '8px' }}>
                     Deskripsi Lengkap Produk
                   </h3>
-                  <p style={{ fontSize: '0.85rem', color: '#48564e', lineHeight: 1.65, margin: 0 }}>
+                  <p style={{ fontSize: '0.86rem', color: '#48564e', lineHeight: 1.7, margin: 0 }}>
                     {selectedProduct.description}
                   </p>
                 </div>
 
                 <div>
-                  <h3 style={{ fontSize: '0.875rem', fontWeight: 700, color: '#142019', marginBottom: '6px' }}>
+                  <h3 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#142019', marginBottom: '8px' }}>
                     Komposisi Bahan Baku
                   </h3>
                   <div
                     style={{
                       backgroundColor: '#f8faf8',
                       border: '1px solid #e1e7e2',
-                      borderRadius: '8px',
-                      padding: '10px 14px',
-                      fontSize: '0.825rem',
+                      borderRadius: '10px',
+                      padding: '12px 16px',
+                      fontSize: '0.84rem',
                       color: '#2d6a4f',
                       fontWeight: 600,
+                      lineHeight: 1.5,
                     }}
                   >
                     {selectedProduct.composition}
@@ -702,23 +798,344 @@ export default function PublicCatalog({ onOpenLogin, onGoToDashboard }) {
                 </div>
               </div>
 
-              {/* Order Flow Info via WhatsApp */}
+              {/* Card 3: Cara Pemesanan via WhatsApp */}
               <div
                 style={{
                   backgroundColor: '#edf7f0',
-                  borderRadius: '14px',
+                  borderRadius: '16px',
                   border: '1px solid #d3e7d8',
-                  padding: '16px 20px',
+                  padding: '20px 24px',
                 }}
               >
-                <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1b4332', marginBottom: '6px' }}>
-                  Cara Pemesanan via WhatsApp
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1b4332', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <MessageSquare size={17} />
+                  <span>Cara Pemesanan via WhatsApp</span>
                 </h4>
-                <ol style={{ paddingLeft: '18px', margin: 0, fontSize: '0.8rem', color: '#2d6a4f', lineHeight: 1.6 }}>
-                  <li>Klik tombol <strong>"Pesan via WhatsApp"</strong> untuk membuka percakapan dengan Toko Farm Berkah.</li>
-                  <li>Rincian produk dan template data diri (Nama, No. WhatsApp, Email, & Alamat Pengiriman) otomatis terisi di chat WhatsApp.</li>
-                  <li>Lengkapi data diri Anda dan kirim pesan untuk konfirmasi pemesanan dan pengiriman barang.</li>
+                <ol style={{ paddingLeft: '20px', margin: 0, fontSize: '0.82rem', color: '#2d6a4f', lineHeight: 1.7 }}>
+                  <li>Tentukan kuantitas pesanan pada formulir di sebelah kanan untuk melihat total tagihan otomatis.</li>
+                  <li>Lengkapi nama, nomor WhatsApp, dan alamat pengiriman Anda.</li>
+                  <li>Klik <strong>"Unduh Draft Invoice"</strong> jika Anda memerlukan dokumen ringkasan resmi pemesanan.</li>
+                  <li>Klik <strong>"Pesan via WhatsApp"</strong> untuk mengirim rincian draft pesanan langsung ke Sales Admin Toko Farm Berkah.</li>
+                  <li>Sales Admin akan memverifikasi stok fisik toko dan menerbitkan QR Code QRIS pembayaran resmi kepada Anda.</li>
                 </ol>
+              </div>
+            </div>
+
+            {/* Right Column: Formulir Pemesanan & Checkout (Sticky & Balanced) */}
+            <div
+              style={{
+                backgroundColor: '#ffffff',
+                borderRadius: '16px',
+                border: '1px solid #e1e7e2',
+                padding: '22px',
+                boxShadow: 'var(--shadow-sm)',
+                position: 'sticky',
+                top: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+              }}
+            >
+              {/* Header Formulir */}
+              <div style={{ paddingBottom: '14px', borderBottom: '1px solid #f1f5f9' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <ShoppingCart size={16} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '1rem', fontWeight: 800, color: '#142019', margin: 0 }}>
+                      Formulir Pemesanan
+                    </h3>
+                    <p style={{ fontSize: '0.74rem', color: '#64748b', margin: 0 }}>
+                      Lengkapi data pesanan untuk dikirim ke WhatsApp toko
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 1. INPUT KUANTITAS & RINGKASAN PEMESANAN DENGAN ESTIMASI HARGA */}
+              <div
+                style={{
+                  padding: '14px',
+                  backgroundColor: '#f8faf8',
+                  borderRadius: '12px',
+                  border: '1px solid #d8e2da',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#142019' }}>
+                    Kuantitas Pesanan:
+                  </label>
+                  <span style={{ fontSize: '0.72rem', color: '#718277' }}>
+                    Sisa Stok: <strong>{selectedProduct.stock || 0} {selectedProduct.unit}</strong>
+                  </span>
+                </div>
+
+                {/* Stepper Input Kuantitas */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setOrderQty((prev) => Math.max(1, prev - 1))}
+                    disabled={orderQty <= 1 || selectedProduct.stock === 0 || selectedProduct.isAvailable === false}
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      backgroundColor: orderQty <= 1 ? '#f1f5f9' : '#ffffff',
+                      color: orderQty <= 1 ? '#94a3b8' : '#142019',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: orderQty <= 1 ? 'not-allowed' : 'pointer',
+                      fontWeight: 700,
+                    }}
+                  >
+                    <Minus size={15} />
+                  </button>
+
+                  <input
+                    type="number"
+                    min="1"
+                    max={selectedProduct.stock || 1}
+                    value={orderQty}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (isNaN(val) || val < 1) setOrderQty(1);
+                      else setOrderQty(Math.min(val, selectedProduct.stock || 1));
+                    }}
+                    disabled={selectedProduct.stock === 0 || selectedProduct.isAvailable === false}
+                    style={{
+                      flex: 1,
+                      height: '36px',
+                      textAlign: 'center',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      fontSize: '0.95rem',
+                      fontWeight: 700,
+                      color: '#142019',
+                      outline: 'none',
+                    }}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setOrderQty((prev) => Math.min(selectedProduct.stock || 1, prev + 1))}
+                    disabled={orderQty >= (selectedProduct.stock || 1) || selectedProduct.stock === 0 || selectedProduct.isAvailable === false}
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      backgroundColor: orderQty >= (selectedProduct.stock || 1) ? '#f1f5f9' : '#ffffff',
+                      color: orderQty >= (selectedProduct.stock || 1) ? '#94a3b8' : '#142019',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: orderQty >= (selectedProduct.stock || 1) ? 'not-allowed' : 'pointer',
+                      fontWeight: 700,
+                    }}
+                  >
+                    <Plus size={15} />
+                  </button>
+                </div>
+
+                {/* Ringkasan Pemesanan & Estimasi Harga */}
+                <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem', color: '#64748b', marginBottom: '3px' }}>
+                    <span>Harga Satuan:</span>
+                    <span>{selectedProduct.priceFormatted}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem', color: '#64748b', marginBottom: '6px' }}>
+                    <span>Kuantitas:</span>
+                    <span>{orderQty} unit</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: '6px', borderTop: '1px solid #e2e8f0' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#142019' }}>Estimasi Total:</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1b4332' }}>
+                      {formatRupiah((selectedProduct.price || 0) * orderQty)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Data Diri Pembeli (Customer Input for Invoice & WhatsApp) */}
+              <div
+                style={{
+                  padding: '12px 14px',
+                  backgroundColor: '#f8faf8',
+                  borderRadius: '12px',
+                  border: '1px solid #d8e2da',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', fontSize: '0.78rem', fontWeight: 700, color: '#1b4332' }}>
+                  <User size={14} />
+                  <span>Data Diri Pembeli:</span>
+                </div>
+
+                <div style={{ marginBottom: '8px' }}>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginBottom: '2px' }}>
+                    Nama Lengkap:
+                  </label>
+                  <input
+                    type="text"
+                    value={custName}
+                    onChange={(e) => setCustName(e.target.value)}
+                    placeholder="Contoh: Ibu Dewi Permata"
+                    style={{ width: '100%', height: '32px', padding: '0 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', color: '#142019', outline: 'none' }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '8px' }}>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginBottom: '2px' }}>
+                    Nomor WhatsApp / HP:
+                  </label>
+                  <input
+                    type="text"
+                    value={custPhone}
+                    onChange={(e) => setCustPhone(e.target.value)}
+                    placeholder="Contoh: +62 813-2233-4455"
+                    style={{ width: '100%', height: '32px', padding: '0 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', color: '#142019', outline: 'none' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.72rem', color: '#64748b', fontWeight: 600, marginBottom: '2px' }}>
+                    Alamat Pengiriman:
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={custAddress}
+                    onChange={(e) => setCustAddress(e.target.value)}
+                    placeholder="Alamat lengkap pengiriman..."
+                    style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.8rem', color: '#142019', resize: 'none', outline: 'none' }}
+                  />
+                </div>
+              </div>
+
+              {/* Feedback Download Toast */}
+              {invoiceToast && (
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    backgroundColor: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '8px',
+                    color: '#16a34a',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                  className="animate-fade-in"
+                >
+                  <CheckCircle2 size={15} />
+                  <span>{invoiceToast}</span>
+                </div>
+              )}
+
+              {/* Action Buttons: Download Draft Invoice & WhatsApp CTA */}
+              {(() => {
+                const isDetailOutOfStock = !selectedProduct.stock || selectedProduct.stock <= 0 || selectedProduct.isAvailable === false;
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {/* Tombol 1: Pesan via WhatsApp (Primary) */}
+                    <button
+                      type="button"
+                      disabled={isDetailOutOfStock}
+                      onClick={() => !isDetailOutOfStock && handleWhatsAppOrder(selectedProduct, orderQty)}
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        borderRadius: '10px',
+                        border: isDetailOutOfStock ? '1px solid #e2e8f0' : 'none',
+                        backgroundColor: isDetailOutOfStock ? '#f1f5f9' : '#2d6a4f',
+                        color: isDetailOutOfStock ? '#94a3b8' : '#ffffff',
+                        fontSize: '0.88rem',
+                        fontWeight: 700,
+                        cursor: isDetailOutOfStock ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        boxShadow: isDetailOutOfStock ? 'none' : '0 3px 8px rgba(45, 106, 79, 0.25)',
+                        transition: 'all 0.2s',
+                        opacity: isDetailOutOfStock ? 0.75 : 1,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isDetailOutOfStock) e.currentTarget.style.backgroundColor = '#1b4332';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isDetailOutOfStock) e.currentTarget.style.backgroundColor = '#2d6a4f';
+                      }}
+                      title={isDetailOutOfStock ? 'Produk sedang habis atau tidak tersedia' : 'Pesan via WhatsApp'}
+                    >
+                      {isDetailOutOfStock ? <XCircle size={16} /> : <MessageSquare size={16} />}
+                      <span>{isDetailOutOfStock ? 'Stok Habis - Tidak Dapat Dipesan' : 'Pesan via WhatsApp'}</span>
+                    </button>
+
+                    {/* Tombol 2: Download Ringkasan Pemesanan / Draft Invoice (Secondary) */}
+                    <button
+                      type="button"
+                      disabled={isDetailOutOfStock}
+                      onClick={() => !isDetailOutOfStock && handleDownloadDraftInvoice(selectedProduct, orderQty)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        border: isDetailOutOfStock ? '1px solid #e2e8f0' : '1.5px solid #2d6a4f',
+                        backgroundColor: '#ffffff',
+                        color: isDetailOutOfStock ? '#94a3b8' : '#2d6a4f',
+                        fontSize: '0.82rem',
+                        fontWeight: 700,
+                        cursor: isDetailOutOfStock ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        transition: 'all 0.15s',
+                        opacity: isDetailOutOfStock ? 0.6 : 1,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isDetailOutOfStock) e.currentTarget.style.backgroundColor = '#f0fdf4';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isDetailOutOfStock) e.currentTarget.style.backgroundColor = '#ffffff';
+                      }}
+                    >
+                      <Download size={15} />
+                      <span>Unduh Draft Invoice (Ringkasan)</span>
+                    </button>
+
+                    <div style={{ fontSize: '0.72rem', color: isDetailOutOfStock ? '#dc2626' : '#718277', textAlign: 'center', marginTop: '2px', fontWeight: isDetailOutOfStock ? 600 : 400 }}>
+                      {isDetailOutOfStock
+                        ? 'Mohon maaf, produk ini sedang kosong dan belum dapat dipesan.'
+                        : <>WhatsApp Toko: <strong>0812-1614-6510</strong></>}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Jaminan Layanan UMKM */}
+              <div
+                style={{
+                  backgroundColor: '#f0fdf4',
+                  borderRadius: '10px',
+                  border: '1px solid #dcfce7',
+                  padding: '10px 12px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '8px',
+                  fontSize: '0.72rem',
+                  color: '#166534',
+                  lineHeight: '1.4',
+                }}
+              >
+                <ShieldCheck size={16} style={{ color: '#16a34a', flexShrink: 0, marginTop: '1px' }} />
+                <span>
+                  <strong>Jaminan Kualitas Toko Farm Berkah:</strong> Stok fisik diperiksa langsung oleh Sales Admin sebelum QRIS diterbitkan demi kenyamanan dan keamanan transaksi Anda.
+                </span>
               </div>
             </div>
           </div>
@@ -1034,6 +1451,8 @@ export default function PublicCatalog({ onOpenLogin, onGoToDashboard }) {
                   </select>
                 </div>
               </div>
+
+
             </div>
           </div>
 
@@ -1098,8 +1517,8 @@ export default function PublicCatalog({ onOpenLogin, onGoToDashboard }) {
                 }}
               >
                 {filteredProducts.map((p) => {
-                  const isLowStock = p.stock > 0 && p.stock <= p.minStock;
-                  const isOutOfStock = p.stock === 0;
+                  const isOutOfStock = !p.stock || p.stock <= 0 || p.isAvailable === false;
+                  const isLowStock = !isOutOfStock && p.stock <= p.minStock;
 
                   return (
                     <div
@@ -1144,9 +1563,12 @@ export default function PublicCatalog({ onOpenLogin, onGoToDashboard }) {
                             width: '100%',
                             height: '100%',
                             objectFit: 'cover',
-                            transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+                            filter: isOutOfStock ? 'grayscale(80%) opacity(0.85)' : 'none',
+                            transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), filter 0.3s ease',
                           }}
-                          onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.06)')}
+                          onMouseEnter={(e) => {
+                            if (!isOutOfStock) e.currentTarget.style.transform = 'scale(1.06)';
+                          }}
                           onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
                           onError={(e) => {
                             e.target.onerror = null;
@@ -1215,7 +1637,7 @@ export default function PublicCatalog({ onOpenLogin, onGoToDashboard }) {
                             {isOutOfStock ? (
                               <>
                                 <XCircle size={12} />
-                                <span>Habis</span>
+                                <span>{p.isAvailable === false ? 'Tidak Tersedia' : 'Habis'}</span>
                               </>
                             ) : isLowStock ? (
                               <>
@@ -1295,40 +1717,18 @@ export default function PublicCatalog({ onOpenLogin, onGoToDashboard }) {
                             </div>
                           </div>
 
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.25fr', gap: '8px' }}>
+                          <div>
                             <button
+                              type="button"
                               onClick={() => handleOpenDetail(p)}
                               style={{
-                                padding: '9px 10px',
-                                borderRadius: '10px',
-                                border: '1px solid #d1d9d3',
-                                backgroundColor: '#ffffff',
-                                color: '#142019',
-                                fontSize: '0.8rem',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '4px',
-                                transition: 'all 0.15s',
-                              }}
-                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8faf8')}
-                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#ffffff')}
-                            >
-                              <Info size={14} />
-                              <span>Detail</span>
-                            </button>
-
-                            <button
-                              onClick={() => handleWhatsAppOrder(p)}
-                              style={{
-                                padding: '9px 12px',
+                                width: '100%',
+                                padding: '10px 14px',
                                 borderRadius: '10px',
                                 border: 'none',
                                 backgroundColor: '#2d6a4f',
                                 color: '#ffffff',
-                                fontSize: '0.8rem',
+                                fontSize: '0.825rem',
                                 fontWeight: 700,
                                 cursor: 'pointer',
                                 display: 'flex',
@@ -1336,13 +1736,20 @@ export default function PublicCatalog({ onOpenLogin, onGoToDashboard }) {
                                 justifyContent: 'center',
                                 gap: '6px',
                                 boxShadow: '0 2px 6px rgba(45, 106, 79, 0.2)',
-                                transition: 'all 0.15s',
+                                transition: 'all 0.18s ease',
                               }}
-                              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1b4332')}
-                              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#2d6a4f')}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = '#1b4332';
+                                e.currentTarget.style.transform = 'translateY(-1px)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = '#2d6a4f';
+                                e.currentTarget.style.transform = 'translateY(0)';
+                              }}
+                              title="Lihat Detail Produk"
                             >
-                              <MessageSquare size={14} />
-                              <span>Pesan WA</span>
+                              <Info size={15} />
+                              <span>Lihat Detail</span>
                             </button>
                           </div>
                         </div>

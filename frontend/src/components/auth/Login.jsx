@@ -8,7 +8,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import ForgotPassword from './ForgotPassword';
 
-export default function LoginForm({ onBackToCatalog, onLoginSuccess }) {
+export default function Login({ onBackToCatalog, onLoginSuccess }) {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -356,14 +356,10 @@ export default function LoginForm({ onBackToCatalog, onLoginSuccess }) {
         &copy; 2026 Toko Farm Berkah. Hak Cipta Dilindungi.
       </footer>
 
-      {/* Forgot Password Modal/Screen */}
+      {/* Modal Pusat Bantuan Lupa Kata Sandi Staf */}
       <ForgotPassword
         isOpen={isForgotOpen}
         onClose={() => setIsForgotOpen(false)}
-        onOpenLoginWithEmail={(resetEmail) => {
-          setEmail(resetEmail);
-          setPassword('');
-        }}
       />
     </div>
   );
