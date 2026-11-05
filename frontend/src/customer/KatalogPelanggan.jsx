@@ -593,7 +593,7 @@ export default function KatalogPelanggan({ onOpenLogin, onGoToDashboard }) {
                 }}
               >
                 <LayoutDashboard size={15} />
-                <span>Dashboard ({user?.name.split(' ')[0]})</span>
+                <span>Dashboard ({(user?.name || 'Staf').split(' ')[0]})</span>
               </button>
             </div>
           ) : (

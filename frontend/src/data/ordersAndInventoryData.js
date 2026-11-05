@@ -4,7 +4,7 @@
 
 import { getStoredProducts, saveStoredProducts, formatRupiah } from './productsData';
 
-const STORAGE_KEY_ORDERS = 'farmsight_orders_db_v3';
+const STORAGE_KEY_ORDERS = 'farmsight_orders_db_v2';
 const STORAGE_KEY_MOVEMENTS = 'farmsight_stock_movements_v1';
 const STORAGE_KEY_DRAFT_INVOICES = 'farmsight_draft_invoices_v1';
 const STORAGE_KEY_FORECASTS = 'farmsight_forecasts_data_v1';
@@ -250,9 +250,8 @@ export const INITIAL_FORECASTS = [
 export function getStoredOrders() {
   try {
     const data = localStorage.getItem(STORAGE_KEY_ORDERS);
-    if (!data) return [];
-    const orders = JSON.parse(data);
-    if (!Array.isArray(orders)) return [];
+    const orders = data ? JSON.parse(data) : INITIAL_ORDERS;
+    if (!Array.isArray(orders) || orders.length === 0) return INITIAL_ORDERS;
     return orders.map((o) => {
       const g1 = o.gateway1Status || (o.status === 'DIBATALKAN' ? 'GAGAL' : 'LOLOS');
       let g2 = o.gateway2Status;
@@ -269,7 +268,7 @@ export function getStoredOrders() {
       };
     });
   } catch {
-    return [];
+    return INITIAL_ORDERS;
   }
 }
 
@@ -284,12 +283,12 @@ export function saveStoredOrders(orders) {
 
 export function resetStoredOrdersToDefault() {
   try {
-    localStorage.setItem(STORAGE_KEY_ORDERS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEY_ORDERS, JSON.stringify(INITIAL_ORDERS));
     window.dispatchEvent(new Event('farmsight_orders_updated'));
-    return [];
+    return INITIAL_ORDERS;
   } catch (err) {
     console.error('Failed to reset orders', err);
-    return [];
+    return INITIAL_ORDERS;
   }
 }
 
@@ -566,19 +565,19 @@ export function generateCustomerQrisWhatsAppUrl(order) {
 
 // Helper: Generate WhatsApp URL to notify customer for re-transfer when nominal doesn't match
 export function generateReTransferWhatsAppUrl(order, customReason) {
-  const cleanPhone = (order.customerPhone || '').replace(/[^0-9]/g, '');
+  const cleanPhone = (order?.customerPhone || '').replace(/[^0-9]/g, '');
   const phoneTarget = cleanPhone.startsWith('0') ? '62' + cleanPhone.slice(1) : cleanPhone;
-  const reason = customReason || `Nominal transfer (Rp ${Number(order.transferAmount || 0).toLocaleString('id-ID')}) belum sesuai dengan total tagihan (${formatRupiah(order.totalAmount)}). Silakan transfer ulang kekurangannya ke QRIS resmi Toko Farm Berkah.`;
+  const reason = customReason || `Nominal transfer (Rp ${Number(order?.transferAmount || 0).toLocaleString('id-ID')}) belum sesuai dengan total tagihan (${formatRupiah(order?.totalAmount || 0)}). Silakan transfer ulang kekurangannya ke QRIS resmi Toko Farm Berkah.`;
   const message = [
-    `Halo kak ${order.customerName || 'Pelanggan'},`,
-    `Pemberitahuan dari Sales Admin Toko Farm Berkah terkait pesanan #${order.id}:`,
+    `Halo kak ${order?.customerName || 'Pelanggan'},`,
+    `Pemberitahuan dari Sales Admin Toko Farm Berkah terkait pesanan #${order?.id}:`,
     ``,
     `⚠️ ${reason}`,
     ``,
     `💳 QRIS RESMI TOKO FARM BERKAH:`,
     `• NMID: ID1026508798372`,
     `• Atas Nama: Toko Farm Berkah`,
-    `• Total Tagihan Resmi: ${formatRupiah(order.totalAmount)}`,
+    `• Total Tagihan Resmi: ${formatRupiah(order?.totalAmount || 0)}`,
     ``,
     `Mohon kirimkan kembali foto struk bukti transfer yang baru ke WhatsApp ini setelah melakukan transfer. Terima kasih! 🙏`,
   ].join('\n');

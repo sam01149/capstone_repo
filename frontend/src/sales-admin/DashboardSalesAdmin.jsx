@@ -935,7 +935,20 @@ export default function DashboardSalesAdmin({ onLogout, onViewCatalog }) {
 
         {/* TAB 1: DASHBOARD PENJUALAN (UTAMA) */}
         {salesView === 'dashboard' && (() => {
-          const horizonData = FARMSIGHT_FORECAST_HORIZONS[salesHorizon] || FARMSIGHT_FORECAST_HORIZONS[4];
+          const fallbackHorizon = {
+            period: '5 Okt sampai 1 Nov 2026',
+            totalRevenue: 'Rp 273.049',
+            avgWeekly: 'Rp 68.262',
+            totalDemand: '24,6 unit',
+            activeProducts: '9 produk',
+            bars: [
+              { label: '5 Okt', value: '82,3', height: 48 },
+              { label: '12 Okt', value: '142,9', height: 82 },
+              { label: '19 Okt', value: '209,3', height: 118 },
+              { label: '26 Okt', value: '273,0', height: 154 },
+            ],
+          };
+          const horizonData = (FARMSIGHT_FORECAST_HORIZONS && FARMSIGHT_FORECAST_HORIZONS[salesHorizon]) || fallbackHorizon;
           return (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
               {/* Banner Ucapan & Status Kerja Sales Admin */}
@@ -1139,7 +1152,7 @@ export default function DashboardSalesAdmin({ onLogout, onViewCatalog }) {
                   <div style={{ position: 'absolute', left: 0, right: 0, bottom: '50%', borderTop: '1px dashed #e2e8f0' }} />
                   <div style={{ position: 'absolute', left: 0, right: 0, bottom: '75%', borderTop: '1px dashed #e2e8f0' }} />
 
-                  {horizonData.bars.map((bar, idx) => (
+                  {(horizonData.bars || []).map((bar, idx) => (
                     <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', zIndex: 2 }}>
                       <div style={{ fontSize: '0.74rem', fontWeight: 800, color: '#6d28d9' }}>
                         {bar.value} rb
@@ -1183,7 +1196,7 @@ export default function DashboardSalesAdmin({ onLogout, onViewCatalog }) {
                   Ringkasan Penjualan Produk Terlaris
                 </h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
-                  {products.slice(0, 4).map((p) => (
+                  {(products || []).slice(0, 4).map((p) => (
                     <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderRadius: '10px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
                       <div>
                         <div style={{ fontWeight: 800, fontSize: '0.86rem', color: '#0f172a' }}>{p.name}</div>

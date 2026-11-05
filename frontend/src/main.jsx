@@ -52,22 +52,44 @@ class ErrorBoundary extends Component {
             <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '20px', lineHeight: 1.5 }}>
               Sistem telah diperbarui. Silakan muat ulang halaman untuk membuka tampilan penuh Toko Farm Berkah.
             </p>
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-              style={{
-                backgroundColor: '#2d6a4f',
-                color: '#ffffff',
-                border: 'none',
-                padding: '12px 24px',
-                borderRadius: '10px',
-                fontWeight: 700,
-                fontSize: '0.9rem',
-                cursor: 'pointer',
-              }}
-            >
-              Muat Ulang Halaman
-            </button>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                style={{
+                  backgroundColor: '#2d6a4f',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '12px 24px',
+                  borderRadius: '10px',
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                  cursor: 'pointer',
+                }}
+              >
+                Muat Ulang Halaman
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem('farmsight_session_user');
+                  localStorage.removeItem('farmsight_current_view');
+                  window.location.reload();
+                }}
+                style={{
+                  backgroundColor: '#f1f5f9',
+                  color: '#475569',
+                  border: '1px solid #cbd5e1',
+                  padding: '12px 20px',
+                  borderRadius: '10px',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                }}
+              >
+                Reset Sesi & Masuk Ulang
+              </button>
+            </div>
           </div>
         </div>
       );
