@@ -835,7 +835,7 @@ export default function DashboardStockManager({ onLogout, onViewCatalog }) {
                     🚨 {ropAlertProducts.length} Produk Perlu Restock Mendesak
                   </div>
                   <p style={{ fontSize: '0.75rem', color: '#475569', margin: '6px 0 0 0', lineHeight: 1.45 }}>
-                    Stok fisik telah menyentuh batas Reorder Point (ROP). Segera jadwalkan produksi atau restock bahan baku.
+                    Stok telah menyentuh batas Reorder Point (ROP). Segera jadwalkan produksi atau restock bahan baku.
                   </p>
                 </div>
 
@@ -928,7 +928,7 @@ export default function DashboardStockManager({ onLogout, onViewCatalog }) {
                     <span>1. Barang Masuk (Restock Manual)</span>
                   </div>
                   <p style={{ fontSize: '0.74rem', color: '#374151', margin: '6px 0 10px 0', lineHeight: 1.45 }}>
-                    Input penambahan stok fisik &bull; Catat mutasi IN &bull; Gateway ROP &bull; Hitung ARIMA/Croston &bull; Generate Laporan.
+                    Input penambahan stok &bull; Catat mutasi IN &bull; Gateway ROP &bull; Hitung ARIMA/Croston &bull; Generate Laporan.
                   </p>
                   <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#15803d', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                     <span>Buka Formulir Restock</span>
@@ -1024,7 +1024,7 @@ export default function DashboardStockManager({ onLogout, onViewCatalog }) {
                   cursor: 'pointer',
                 }}
               >
-                Tabel Stok Fisik Toko ({products.length} SKU)
+                Tabel Stok Toko ({products.length} SKU)
               </button>
               <button
                 type="button"
@@ -1796,7 +1796,7 @@ export default function DashboardStockManager({ onLogout, onViewCatalog }) {
                     1. Input Barang Masuk (Restock Manual)
                   </h3>
                   <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
-                    Catat penambahan stok fisik & kalkulasi ulang Gateway ROP
+                    Catat penambahan stok & kalkulasi ulang Gateway ROP
                   </span>
                 </div>
               </div>

@@ -8,7 +8,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import LupaPassword from './LupaPassword';
 
-export default function Login({ onBackToCatalog, onLoginSuccess, onRequirePasswordChange }) {
+export default function Login({ onBackToCatalog, onBackToHome, onLoginSuccess, onRequirePasswordChange }) {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,18 +17,18 @@ export default function Login({ onBackToCatalog, onLoginSuccess, onRequirePasswo
   const [loading, setLoading] = useState(false);
   const [isForgotOpen, setIsForgotOpen] = useState(false);
 
-  // Auto-dismiss error message after 3 seconds
+  // Auto-dismiss error message after 4 seconds
   useEffect(() => {
     if (error) {
       const timer = setTimeout(() => {
         setError('');
-      }, 3000);
+      }, 4000);
       return () => clearTimeout(timer);
     }
   }, [error]);
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     setError('');
 
     if (!email.trim() || !password) {
@@ -39,22 +39,19 @@ export default function Login({ onBackToCatalog, onLoginSuccess, onRequirePasswo
     setLoading(true);
     try {
       const loggedInUser = await login(email, password);
+      setLoading(false);
 
-      setTimeout(() => {
-        setLoading(false);
-        // Cek apakah akun memiliki status must_change_password = true
-        if (loggedInUser?.must_change_password) {
-          if (onRequirePasswordChange) {
-            onRequirePasswordChange(loggedInUser);
-          } else if (onLoginSuccess) {
-            onLoginSuccess(loggedInUser);
-          }
-        } else {
-          if (onLoginSuccess) {
-            onLoginSuccess(loggedInUser);
-          }
+      if (loggedInUser?.must_change_password) {
+        if (onRequirePasswordChange) {
+          onRequirePasswordChange(loggedInUser);
+        } else if (onLoginSuccess) {
+          onLoginSuccess(loggedInUser);
         }
-      }, 400);
+      } else {
+        if (onLoginSuccess) {
+          onLoginSuccess(loggedInUser);
+        }
+      }
     } catch (err) {
       setError(err.message || 'Gagal masuk. Periksa email dan kata sandi Anda.');
       setLoading(false);
@@ -71,7 +68,7 @@ export default function Login({ onBackToCatalog, onLoginSuccess, onRequirePasswo
         fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
       }}
     >
-      {/* Top Left Navigation: Kembali ke Katalog */}
+      {/* Top Left Navigation: Kembali ke Beranda / Katalog */}
       <header
         style={{
           height: '72px',
@@ -80,41 +77,39 @@ export default function Login({ onBackToCatalog, onLoginSuccess, onRequirePasswo
           alignItems: 'center',
         }}
       >
-        {onBackToCatalog && (
-          <button
-            type="button"
-            onClick={onBackToCatalog}
-            id="btn-back-to-catalog"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 14px',
-              borderRadius: '10px',
-              border: '1px solid #e2e8f0',
-              backgroundColor: '#ffffff',
-              color: '#475569',
-              fontSize: '0.85rem',
-              fontWeight: 500,
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f8fafc';
-              e.currentTarget.style.borderColor = '#cbd5e1';
-              e.currentTarget.style.color = '#0f172a';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#ffffff';
-              e.currentTarget.style.borderColor = '#e2e8f0';
-              e.currentTarget.style.color = '#475569';
-            }}
-          >
-            <ArrowLeft size={16} />
-            <span>Kembali ke Katalog</span>
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={onBackToHome || onBackToCatalog}
+          id="btn-back-to-home"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 16px',
+            borderRadius: '10px',
+            border: '1px solid #e2e8f0',
+            backgroundColor: '#ffffff',
+            color: '#475569',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#f8fafc';
+            e.currentTarget.style.borderColor = '#cbd5e1';
+            e.currentTarget.style.color = '#0f172a';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#ffffff';
+            e.currentTarget.style.borderColor = '#e2e8f0';
+            e.currentTarget.style.color = '#475569';
+          }}
+        >
+          <ArrowLeft size={16} />
+          <span>Kembali ke Beranda</span>
+        </button>
       </header>
 
       {/* Main Centered Login Card (Dribbble Minimalist Style) */}

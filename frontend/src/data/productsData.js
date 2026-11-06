@@ -44,7 +44,7 @@ export const PRODUCTS_CATALOG = [
     priceFormatted: 'Rp 4.000',
     stock: 18,
     minStock: 10,
-    unit: '1 IKAT',
+    unit: 'Ikat',
     rating: 4.8,
     soldCount: 310,
     badge: 'Sayur Hijau',
@@ -90,7 +90,7 @@ export const PRODUCTS_CATALOG = [
     priceFormatted: 'Rp 10.000',
     stock: 0,
     minStock: 10,
-    unit: '1 POLIBAG',
+    unit: 'Polibag',
     rating: 4.8,
     soldCount: 195,
     badge: 'Pekarangan Sehat',
@@ -113,7 +113,7 @@ export const PRODUCTS_CATALOG = [
     priceFormatted: 'Rp 5.000',
     stock: 40,
     minStock: 20,
-    unit: '1 PCS',
+    unit: 'Pcs',
     rating: 4.9,
     soldCount: 380,
     badge: 'Fresh Daily',
@@ -182,7 +182,7 @@ export const PRODUCTS_CATALOG = [
     priceFormatted: 'Rp 2.000',
     stock: 60,
     minStock: 25,
-    unit: '1 PCS',
+    unit: 'Pcs',
     rating: 4.7,
     soldCount: 520,
     badge: 'Hangat & Murah',
@@ -205,7 +205,7 @@ export const PRODUCTS_CATALOG = [
     priceFormatted: 'Rp 3.000',
     stock: 25,
     minStock: 10,
-    unit: '1 IKAT',
+    unit: 'Ikat',
     rating: 4.8,
     soldCount: 280,
     badge: 'Petik Segar',
@@ -228,7 +228,7 @@ export const PRODUCTS_CATALOG = [
     priceFormatted: 'Rp 10.000',
     stock: 30,
     minStock: 15,
-    unit: '1 KG',
+    unit: 'Kg',
     rating: 4.8,
     soldCount: 190,
     badge: 'Manis Gurih',
@@ -297,7 +297,7 @@ export const PRODUCTS_CATALOG = [
     priceFormatted: 'Rp 3.000',
     stock: 20,
     minStock: 10,
-    unit: '1 IKAT',
+    unit: 'Ikat',
     rating: 4.8,
     soldCount: 340,
     badge: 'Segar Murah',
@@ -320,7 +320,7 @@ export const PRODUCTS_CATALOG = [
     priceFormatted: 'Rp 1.000',
     stock: 25,
     minStock: 10,
-    unit: '1 IKAT',
+    unit: 'Ikat',
     rating: 4.8,
     soldCount: 380,
     badge: 'Wangi Segar',
@@ -343,7 +343,7 @@ export const PRODUCTS_CATALOG = [
     priceFormatted: 'Rp 2.500',
     stock: 12,
     minStock: 10,
-    unit: '1 IKAT',
+    unit: 'Ikat',
     rating: 4.7,
     soldCount: 160,
     badge: 'Lalapan Herbal',
@@ -458,7 +458,7 @@ export const PRODUCTS_CATALOG = [
     priceFormatted: 'Rp 10.000',
     stock: 20,
     minStock: 8,
-    unit: '1 KG',
+    unit: 'Kg',
     rating: 4.9,
     soldCount: 210,
     badge: 'Panen Utama',
@@ -573,7 +573,7 @@ export const PRODUCTS_CATALOG = [
     priceFormatted: 'Rp 10.000',
     stock: 25,
     minStock: 10,
-    unit: '1 KG',
+    unit: 'Kg',
     rating: 4.8,
     soldCount: 220,
     badge: 'Panen Segar',
@@ -596,7 +596,7 @@ export const PRODUCTS_CATALOG = [
     priceFormatted: 'Rp 17.000',
     stock: 15,
     minStock: 8,
-    unit: '1 SACK',
+    unit: 'Sack',
     rating: 4.9,
     soldCount: 140,
     badge: 'Subur Alami',
@@ -619,7 +619,7 @@ export const PRODUCTS_CATALOG = [
     priceFormatted: 'Rp 6.000',
     stock: 20,
     minStock: 15,
-    unit: '1 BOTOL',
+    unit: 'Botol',
     rating: 4.8,
     soldCount: 160,
     badge: 'Dingin Segar',
@@ -642,7 +642,7 @@ export const PRODUCTS_CATALOG = [
     priceFormatted: 'Rp 6.000',
     stock: 22,
     minStock: 15,
-    unit: '1 BOTOL',
+    unit: 'Botol',
     rating: 4.8,
     soldCount: 290,
     badge: 'Vitamin C',
@@ -665,7 +665,7 @@ export const PRODUCTS_CATALOG = [
     priceFormatted: 'Rp 6.000',
     stock: 18,
     minStock: 20,
-    unit: '1 BOTOL',
+    unit: 'Botol',
     rating: 4.9,
     soldCount: 450,
     badge: 'Segar & Sehat',
@@ -688,7 +688,7 @@ export const PRODUCTS_CATALOG = [
     priceFormatted: 'Rp 6.000',
     stock: 15,
     minStock: 15,
-    unit: '1 BOTOL',
+    unit: 'Botol',
     rating: 4.7,
     soldCount: 210,
     badge: 'Penyejuk Alami',
@@ -803,7 +803,7 @@ export const PRODUCTS_CATALOG = [
     priceFormatted: 'Rp 20.000',
     stock: 10,
     minStock: 5,
-    unit: '1 SISIR',
+    unit: 'Sisir',
     rating: 4.9,
     soldCount: 110,
     badge: 'Panen Kebun',
@@ -826,7 +826,7 @@ export const PRODUCTS_CATALOG = [
     priceFormatted: 'Rp 17.000',
     stock: 12,
     minStock: 6,
-    unit: '1 SACK',
+    unit: 'Sack',
     rating: 4.8,
     soldCount: 110,
     badge: 'Nutrisi Tanaman',
@@ -872,7 +872,7 @@ export const PRODUCTS_CATALOG = [
     priceFormatted: 'Rp 5.000',
     stock: 15,
     minStock: 10,
-    unit: '1 PORSI',
+    unit: 'Porsi',
     rating: 4.9,
     soldCount: 270,
     badge: 'Menu Khas',
@@ -895,7 +895,7 @@ export const PRODUCTS_CATALOG = [
     priceFormatted: 'Rp 4.000',
     stock: 18,
     minStock: 10,
-    unit: '1 IKAT',
+    unit: 'Ikat',
     rating: 4.8,
     soldCount: 210,
     badge: 'Sayur Segar',
@@ -918,7 +918,7 @@ export const PRODUCTS_CATALOG = [
     priceFormatted: 'Rp 4.000',
     stock: 20,
     minStock: 10,
-    unit: '1 IKAT',
+    unit: 'Ikat',
     rating: 4.8,
     soldCount: 290,
     badge: 'Paket Sayur',
@@ -1008,6 +1008,28 @@ export function formatRupiah(amount) {
   return `Rp ${Number(amount).toLocaleString('id-ID')}`;
 }
 
+// Bersihkan satuan agar tidak muncul awalan "1 " (misal: "1 BOTOL" -> "Botol", "1 IKAT" -> "Ikat")
+export function cleanUnit(unit) {
+  if (!unit) return '';
+  const trimmed = String(unit).trim();
+  if (/^1\s+/i.test(trimmed)) {
+    const stripped = trimmed.replace(/^1\s+/i, '').trim();
+    return stripped.charAt(0).toUpperCase() + stripped.slice(1).toLowerCase();
+  }
+  if (/^(botol|ikat|pcs|polibag|sack|sisir|porsi)$/i.test(trimmed)) {
+    return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+  }
+  return trimmed;
+}
+
+// Format kuantitas dan satuan dengan pemisah "/" agar tidak menyatu (contoh: 3 / 100 GR, 2 / Botol)
+export function formatQtyUnit(qty, unit) {
+  const q = qty ?? 0;
+  const u = cleanUnit(unit);
+  if (!u || u.toLowerCase() === 'unit') return `${q} unit`;
+  return `${q} / ${u}`;
+}
+
 export function getStoredProducts() {
   try {
     const data = localStorage.getItem(STORAGE_KEY_PRODUCTS);
@@ -1015,6 +1037,7 @@ export function getStoredProducts() {
     if (!Array.isArray(parsed) || parsed.length === 0) return PRODUCTS_CATALOG;
     return parsed.map((p) => ({
       ...p,
+      unit: cleanUnit(p.unit),
       visibility: p.visibility || (p.isAvailable === false ? 'hidden' : 'visible'),
     }));
   } catch {

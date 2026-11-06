@@ -55,7 +55,7 @@ const CATEGORY_OPTIONS = [
 export default function DashboardSuperAdmin({ onLogout, onViewCatalog }) {
   const {
     user,
-    users,
+    users = [],
     createUser,
     updateUser,
     toggleUserStatus,
@@ -346,21 +346,29 @@ export default function DashboardSuperAdmin({ onLogout, onViewCatalog }) {
     return matchesSearch && matchesCat && matchesVis;
   });
 
-  const filteredUsers = users.filter((u) => {
+  const safeUsers = Array.isArray(users) ? users : [];
+  const filteredUsers = safeUsers.filter((u) => {
+    if (!u) return false;
+    const name = u.name || '';
+    const email = u.email || '';
+    const roleTitle = u.roleTitle || '';
+    const q = (userSearch || '').toLowerCase();
     const matchesSearch =
-      u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
-      u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
-      u.roleTitle.toLowerCase().includes(userSearch.toLowerCase());
+      name.toLowerCase().includes(q) ||
+      email.toLowerCase().includes(q) ||
+      roleTitle.toLowerCase().includes(q);
     const matchesRole = userRoleFilter === 'ALL' || u.role === userRoleFilter;
     return matchesSearch && matchesRole;
   });
 
   // Calculate Executive Stats
-  const totalRevenue = orders
-    .filter((o) => o.gateway2Status === 'LOLOS' || o.status === 'SELESAI')
+  const safeOrders = Array.isArray(orders) ? orders : [];
+  const safeProducts = Array.isArray(products) ? products : [];
+  const totalRevenue = safeOrders
+    .filter((o) => o && (o.gateway2Status === 'LOLOS' || o.status === 'SELESAI'))
     .reduce((sum, curr) => sum + (curr.totalAmount || 0), 0);
-  const totalCompletedOrders = orders.filter((o) => o.gateway2Status === 'LOLOS' || o.status === 'SELESAI').length;
-  const criticalStockCount = products.filter((p) => p.stock <= (p.reorderPoint || p.minStock || 15)).length;
+  const totalCompletedOrders = safeOrders.filter((o) => o && (o.gateway2Status === 'LOLOS' || o.status === 'SELESAI')).length;
+  const criticalStockCount = safeProducts.filter((p) => p && p.stock <= (p.reorderPoint || p.minStock || 15)).length;
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f4f6f4' }}>
@@ -549,7 +557,7 @@ export default function DashboardSuperAdmin({ onLogout, onViewCatalog }) {
             }}
           >
             <Users size={16} />
-            <span>Manajemen Pengguna & Peran ({users.length})</span>
+            <span>Manajemen Pengguna & Peran ({safeUsers.length})</span>
           </button>
 
           <button
@@ -748,7 +756,7 @@ export default function DashboardSuperAdmin({ onLogout, onViewCatalog }) {
               >
                 <div style={{ fontWeight: 800, color: '#1e40af', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Users size={18} />
-                  <span>Kelola Akun Staf ({users.length} Akun)</span>
+                  <span>Kelola Akun Staf ({safeUsers.length} Akun)</span>
                 </div>
                 <p style={{ fontSize: '0.78rem', color: '#374151', margin: '6px 0 10px 0' }}>
                   Input staf baru, buat kata sandi sementara terenkripsi hash, set must_change_password = true, dan lakukan reset sandi staf.
@@ -887,7 +895,7 @@ export default function DashboardSuperAdmin({ onLogout, onViewCatalog }) {
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                     <div>
-                      <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Stok Fisik Awal</label>
+                      <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Stok Awal</label>
                       <input
                         type="number"
                         value={prodFormData.stock}
@@ -1061,7 +1069,7 @@ export default function DashboardSuperAdmin({ onLogout, onViewCatalog }) {
                     }}
                   >
                     <Plus size={16} />
-                    <span>+ Tambah Produk Baru</span>
+                    <span>Tambah Produk Baru</span>
                   </button>
                 </div>
 
@@ -1173,7 +1181,7 @@ export default function DashboardSuperAdmin({ onLogout, onViewCatalog }) {
                   }}
                 >
                   <Plus size={16} />
-                  <span>+ Aksi 1: Input Akun Baru & Role</span>
+                  <span>Aksi 1: Input Akun & Peran Baru</span>
                 </button>
               </div>
             </div>
@@ -1534,7 +1542,7 @@ export default function DashboardSuperAdmin({ onLogout, onViewCatalog }) {
                   cursor: 'pointer',
                 }}
               >
-                Laporan Stok Fisik ({products.length})
+                Laporan Stok Produk ({products.length})
               </button>
               <button
                 onClick={() => setReportType('forecasting')}

@@ -2,11 +2,11 @@
 // Handles: Customer Draft Invoices, Sales Orders, Gateway Verifications,
 // QRIS Payment, Stock Deduction, Stock Movement, ROP Alerts, Demand Forecasting, and Reports.
 
-import { getStoredProducts, saveStoredProducts, formatRupiah } from './productsData';
+import { getStoredProducts, saveStoredProducts, formatRupiah, formatQtyUnit } from './productsData';
 
-const STORAGE_KEY_ORDERS = 'farmsight_orders_db_v2';
+const STORAGE_KEY_ORDERS = 'farmsight_orders_db_v3';
 const STORAGE_KEY_MOVEMENTS = 'farmsight_stock_movements_v1';
-const STORAGE_KEY_DRAFT_INVOICES = 'farmsight_draft_invoices_v1';
+const STORAGE_KEY_DRAFT_INVOICES = 'farmsight_draft_invoices_v2';
 const STORAGE_KEY_FORECASTS = 'farmsight_forecasts_data_v1';
 
 // Sample Authentic Indonesian Banking Receipts (SVG Data URLs for 100% reliable offline rendering)
@@ -265,6 +265,7 @@ export function getStoredOrders() {
         ...o,
         gateway1Status: g1,
         gateway2Status: g2,
+        reTransferNote: o.status === 'SELESAI' ? null : o.reTransferNote,
       };
     });
   } catch {
@@ -424,7 +425,8 @@ export function checkProductStock(productId, requestedQty) {
     return { sufficient: false, currentStock: 0, reason: 'Produk tidak ditemukan di database.' };
   }
   const isAvailable = product.isAvailable !== false;
-  const currentStock = Number(product.stock) || 0;
+  // Stok yang bisa dijual = stok fisik - stok yang sudah direservasi pesanan lain (menunggu bayar)
+  const currentStock = Math.max(0, (Number(product.stock) || 0) - getReservedQty(productId));
   const sufficient = isAvailable && currentStock >= requestedQty;
 
   return {
@@ -435,7 +437,7 @@ export function checkProductStock(productId, requestedQty) {
     reason: !isAvailable
       ? 'Produk sedang berstatus Tidak Tersedia.'
       : currentStock < requestedQty
-        ? `Stok fisik (${currentStock} ${product.unit}) kurang dari jumlah pesanan (${requestedQty} ${product.unit}).`
+        ? `Stok toko (${currentStock} ${product.unit}) kurang dari jumlah pesanan (${requestedQty} ${product.unit}).`
         : 'Stok tersedia mencukupi.',
   };
 }
@@ -453,7 +455,11 @@ export function createSalesOrder({
   const products = getStoredProducts();
   const product = products.find((p) => p.id === productId);
 
-  const newOrderId = `ORD-2026-${String(Math.floor(82 + Math.random() * 900)).padStart(3, '0')}`;
+  const existingIds = new Set(getStoredOrders().map((o) => o.id));
+  let newOrderId;
+  do {
+    newOrderId = `ORD-${new Date().getFullYear()}-${String(Math.floor(100 + Math.random() * 900))}`;
+  } while (existingIds.has(newOrderId));
   const totalAmount = (product?.price || 0) * quantity;
   const now = new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
 
@@ -469,6 +475,7 @@ export function createSalesOrder({
       productName: product?.name || 'Produk',
       unit: product?.unit || 'Pcs',
       price: product?.price || 0,
+      unitPrice: product?.price || 0,
       quantity,
       totalAmount,
       status: 'DIBATALKAN',
@@ -502,6 +509,7 @@ export function createSalesOrder({
     productName: product?.name || 'Produk',
     unit: product?.unit || 'Pcs',
     price: product?.price || 0,
+    unitPrice: product?.price || 0,
     quantity,
     totalAmount,
     status: 'MENUNGGU_PEMBAYARAN',
@@ -530,31 +538,27 @@ export function createSalesOrder({
   };
 }
 
-// 3. Helper: Generate WhatsApp URL from Sales Admin to Customer (Sends QRIS & Payment Confirmation Link)
+// 3. Helper: Generate WhatsApp URL from Sales Admin to Customer (Sends Payment Instructions directly via WhatsApp)
 export function generateCustomerQrisWhatsAppUrl(order) {
   const cleanPhone = (order.customerPhone || '').replace(/[^0-9]/g, '');
   const phoneTarget = cleanPhone.startsWith('0') ? '62' + cleanPhone.slice(1) : cleanPhone;
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://tokofarmberkah.id';
-  const paymentLink = `${baseUrl}?bayar=${order.id}`;
 
   const message = [
     `Halo kak ${order.customerName || 'Pelanggan'},`,
     `Terima kasih telah memesan produk segar & higienis di Toko Farm Berkah! 🌿`,
     ``,
-    `Berikut rincian pesanan Anda yang telah divalidasi ketersediaan stok fisiknya:`,
-    `• No. Pesanan: ${order.id}`,
-    `• Produk: ${order.productName} (${order.quantity} unit)`,
-    `• Total Tagihan: ${formatRupiah(order.totalAmount)}`,
+    `Pesanan Anda telah kami validasi dan ketersediaan stok telah direservasi:`,
+    `* No. Pesanan: ${order.id}`,
+    `* Produk: ${order.productName} (${formatQtyUnit(order.quantity, order.unit)})`,
+    `* Total Tagihan Resmi: ${formatRupiah(order.totalAmount)}`,
     ``,
     `💳 METODE PEMBAYARAN RESMI (QRIS TOKO FARM BERKAH):`,
-    `• QRIS NMID: ID1026508798372`,
-    `• Atas Nama: Toko Farm Berkah`,
-    `• Nominal Transfer: ${formatRupiah(order.totalAmount)} (Tepat)`,
+    `* QRIS NMID: ID1026508798372`,
+    `* Atas Nama: Toko Farm Berkah`,
+    `* Nominal Transfer: ${formatRupiah(order.totalAmount)} (Harap transfer sesuai dengan nominal yang ditentukan)`,
     ``,
-    `📲 Link Konfirmasi Pembayaran & Unduh QRIS:`,
-    `${paymentLink}`,
-    ``,
-    `Setelah Anda melakukan transfer scan QRIS, mohon kirimkan foto struk/bukti pembayaran melalui link di atas atau balas langsung ke WhatsApp ini.`,
+    `Silakan lakukan pembayaran dengan memindai gambar QRIS resmi Toko Farm Berkah di atas.`,
+    `Setelah berhasil transfer, mohon langsung kirimkan foto struk/bukti transfer Anda membalas ke WhatsApp ini agar dapat segera diverifikasi oleh Sales Admin kami. Terima kasih! 🙏`,
     ``,
     `Salam hangat,`,
     `Sales Admin Toko Farm Berkah`,
@@ -585,6 +589,33 @@ export function generateReTransferWhatsAppUrl(order, customReason) {
   return `https://api.whatsapp.com/send?phone=${phoneTarget}&text=${encodeURIComponent(message)}`;
 }
 
+// Helper: Generate WhatsApp URL to notify customer when order is cancelled due to insufficient stock
+export function generateStockCancelledWhatsAppUrl(order, availableStock = 0) {
+  const cleanPhone = (order?.customerPhone || '').replace(/[^0-9]/g, '');
+  const phoneTarget = cleanPhone.startsWith('0') ? '62' + cleanPhone.slice(1) : cleanPhone;
+  const stockInfo = availableStock !== undefined ? availableStock : 0;
+  const message = [
+    `Halo kak ${order?.customerName || 'Pelanggan'},`,
+    `Terima kasih telah berbelanja di Toko Farm Berkah. 🙏`,
+    ``,
+    `Mohon maaf yang sebesar-besarnya, pesanan Anda belum dapat kami proses karena ketersediaan stok produk di toko saat ini tidak mencukupi:`,
+    `• No. Pesanan: ${order?.id || '-'}`,
+    `• Produk: ${order?.productName || '-'}`,
+    `• Jumlah Pesanan: ${order?.quantity || 0} ${order?.unit || 'unit'}`,
+    `• Sisa Stok Toko: ${stockInfo} ${order?.unit || 'unit'}`,
+    ``,
+    `Oleh karena itu, pesanan ${order?.id || ''} dengan berat hati kami *BATALKAN*.`,
+    `Kakak dapat memesan produk alternatif lainnya di katalog kami atau mengurangi jumlah pesanan ya kak.`,
+    ``,
+    `Terima kasih banyak atas pengertian dan kerjasamanya! 🙏🌿`,
+    ``,
+    `Salam hangat,`,
+    `Sales Admin Toko Farm Berkah`,
+  ].join('\n');
+
+  return `https://api.whatsapp.com/send?phone=${phoneTarget}&text=${encodeURIComponent(message)}`;
+}
+
 // 4. Helper: Generate WhatsApp URL from Customer to Sales Admin (Customer sends Proof)
 export function generateCustomerProofWhatsAppUrl(order, proofDetails = {}) {
   const adminPhone = '6281216146510'; // WhatsApp Sales Admin Toko Farm Berkah
@@ -607,7 +638,7 @@ export function generateCustomerProofWhatsAppUrl(order, proofDetails = {}) {
   return `https://api.whatsapp.com/send?phone=${adminPhone}&text=${encodeURIComponent(message)}`;
 }
 
-// 5. Customer Submits Payment Proof (Updates Order Status to SUDAH_BAYAR)
+// 5. Customer Submits Payment Proof (Updates Order Status to SUDAH_BAYAR / Updates Re-transfer Proof)
 export function submitTransferProof(orderId, proofImageUrl, transferAmount, bankName, customerNote) {
   const orders = getStoredOrders();
   const order = orders.find((o) => o.id === orderId);
@@ -625,10 +656,13 @@ export function submitTransferProof(orderId, proofImageUrl, transferAmount, bank
         status: 'SUDAH_BAYAR',
         gateway2Status: 'SUDAH_BAYAR',
         transferProofImage: finalProof,
+        paymentProofUrl: finalProof,
         transferAmount: finalAmount,
         transferBank: finalBank,
         transferTime: now,
         customerTransferNote: customerNote || '',
+        reTransferNote: null,
+        newProofReceived: true, // Menandai bukti transfer baru telah dicatat sales admin
       };
     }
     return o;
@@ -657,6 +691,9 @@ export function verifyAndConfirmPayment(orderId, isAmountValid, customNote) {
           status: 'PERLU_TRANSFER_ULANG',
           gateway2Status: 'TRANSFER_ULANG',
           reTransferNote: customNote || `Nominal transfer (Rp ${Number(o.transferAmount || 0).toLocaleString('id-ID')}) belum sesuai dengan total tagihan (${formatRupiah(o.totalAmount)}). Silakan transfer ulang kekurangannya.`,
+          newProofReceived: false, // Kunci tombol Verifikasi Ulang sampai admin mencatat bukti baru
+          paymentProofUrl: null,
+          transferProofImage: null,
         };
       }
       return o;
@@ -681,6 +718,7 @@ export function verifyAndConfirmPayment(orderId, isAmountValid, customNote) {
         gateway2Status: 'LOLOS',
         stockReserved: false,
         confirmedAt: nowStr,
+        reTransferNote: null,
       };
     }
     return o;
@@ -720,7 +758,7 @@ export function verifyAndConfirmPayment(orderId, isAmountValid, customNote) {
   saveStoredMovements([newMovement, ...movements]);
 
   // GATEWAY 3: REORDER POINT (ROP) CHECK
-  const rop = targetProduct?.reorderPoint || targetProduct?.minStock || 15;
+  const rop = getProductRop(targetProduct);
   const isRopTriggered = remainingStockAfter <= rop;
   const ropAlert = isRopTriggered
     ? `ALERT: Sisa stok ${order.productName} (${remainingStockAfter} ${order.unit}) telah menyentuh batas Reorder Point (ROP: ${rop} unit). Status: PERLU RESTOCK!`
@@ -847,3 +885,275 @@ export const FARMSIGHT_FORECAST_HORIZONS = {
   },
 };
 
+
+// =============================================================
+// MESIN STOK & FORECAST (dipakai Sales Admin + Stock Manager)
+// Catatan: semua masih DUMMY di localStorage (backend dikerjakan tim lain)
+// =============================================================
+
+const ACTIVE_RESERVE_STATUSES = ['MENUNGGU_PEMBAYARAN', 'SUDAH_BAYAR', 'PERLU_TRANSFER_ULANG'];
+
+// Jumlah stok yang sedang direservasi oleh pesanan yang belum lunas
+export function getReservedQty(productId, excludeOrderId) {
+  return getStoredOrders()
+    .filter((o) => o.productId === productId && o.id !== excludeOrderId && ACTIVE_RESERVE_STATUSES.includes(o.status))
+    .reduce((sum, o) => sum + (Number(o.quantity) || 0), 0);
+}
+
+// Batalkan pesanan (melepas reservasi stok)
+export function cancelSalesOrder(orderId, reason) {
+  const orders = getStoredOrders();
+  const updated = orders.map((o) =>
+    o.id === orderId
+      ? { ...o, status: 'DIBATALKAN', gateway2Status: 'DIBATALKAN', stockReserved: false, cancellationReason: reason || 'Dibatalkan oleh Sales Admin' }
+      : o
+  );
+  saveStoredOrders(updated);
+  return updated.find((o) => o.id === orderId);
+}
+
+// Tandai QRIS sudah dikirim ke WhatsApp customer
+export function markQrisSent(orderId) {
+  const orders = getStoredOrders();
+  const updated = orders.map((o) =>
+    o.id === orderId
+      ? { ...o, qrisSent: true, qrisSentAt: new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' }) }
+      : o
+  );
+  saveStoredOrders(updated);
+  return updated.find((o) => o.id === orderId);
+}
+
+export function getProductForecast(productId) {
+  return getStoredForecasts().find((f) => f.productId === productId) || null;
+}
+
+// Reorder Point: pakai hasil forecast bila ada, kalau belum pakai minStock produk
+export function getProductRop(product) {
+  if (!product) return 0;
+  const f = getProductForecast(product.id);
+  if (f && Number.isFinite(Number(f.reorderPoint))) return Number(f.reorderPoint);
+  return Number(product.reorderPoint || product.minStock || 10);
+}
+
+export function getProductSafetyStock(product) {
+  if (!product) return 0;
+  const f = getProductForecast(product.id);
+  if (f && Number.isFinite(Number(f.safetyStock))) return Number(f.safetyStock);
+  return Math.ceil((Number(product.minStock) || 10) * 0.5);
+}
+
+// Ringkasan status stok semua produk (untuk Inventory Dashboard)
+export function getInventoryStatusList() {
+  const products = getStoredProducts();
+  const forecasts = getStoredForecasts();
+  return products.map((p) => {
+    const f = forecasts.find((x) => x.productId === p.id) || null;
+    const stock = Number(p.stock) || 0;
+    const reserved = getReservedQty(p.id);
+    const rop = getProductRop(p);
+    const safetyStock = getProductSafetyStock(p);
+    let status = 'AMAN';
+    if (stock <= 0) status = 'HABIS';
+    else if (stock <= rop) status = 'PERLU_RESTOCK';
+    return {
+      ...p,
+      stock,
+      reserved,
+      available: Math.max(0, stock - reserved),
+      rop,
+      safetyStock,
+      forecast: f,
+      stockStatus: status,
+    };
+  });
+}
+
+// Barang Masuk (restock) / Barang Keluar (rusak, kadaluwarsa, manual)
+// -> Update stok -> Catat stock movement -> Cek gateway ROP
+export function recordStockMovement({ productId, type, quantity, category, reference, note, operator }) {
+  const qty = Math.abs(Number(quantity) || 0);
+  if (!productId || qty <= 0) throw new Error('Pilih produk dan isi jumlah lebih dari 0.');
+
+  const products = getStoredProducts();
+  const product = products.find((p) => p.id === productId);
+  if (!product) throw new Error('Produk tidak ditemukan.');
+
+  const currentStock = Number(product.stock) || 0;
+  if (type === 'OUT' && qty > currentStock) {
+    throw new Error(`Jumlah keluar (${qty}) melebihi stok saat ini (${currentStock}).`);
+  }
+
+  const newStock = type === 'IN' ? currentStock + qty : currentStock - qty;
+  saveStoredProducts(products.map((p) => (p.id === productId ? { ...p, stock: newStock } : p)));
+
+  const nowStr = new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
+  const movement = {
+    id: `MOV-${Date.now().toString().slice(-6)}`,
+    date: nowStr,
+    productId,
+    productName: product.name,
+    type,
+    category: category || (type === 'IN' ? 'Restock Manual' : 'Pengurangan Manual'),
+    reference: reference || '-',
+    note: note || '',
+    quantity: type === 'IN' ? qty : -qty,
+    remainingStock: newStock,
+    operator: operator || 'Stock Manager',
+  };
+  saveStoredMovements([movement, ...getStoredMovements()]);
+
+  const rop = getProductRop({ ...product, stock: newStock });
+  const isRopTriggered = newStock <= rop;
+  return {
+    movement,
+    product: { ...product, stock: newStock },
+    newStock,
+    rop,
+    isRopTriggered,
+    message: isRopTriggered
+      ? `ALERT: Sisa stok ${product.name} (${newStock}) ≤ ROP (${rop}). Perlu restock!`
+      : `Status stok ${product.name} aman (${newStock} > ROP ${rop}).`,
+  };
+}
+
+// Seeded random agar hasil forecast dummy konsisten
+function seededRandom(seedStr) {
+  let h = 0;
+  for (let i = 0; i < seedStr.length; i++) h = (Math.imul(31, h) + seedStr.charCodeAt(i)) | 0;
+  return () => {
+    h = (Math.imul(h ^ (h >>> 15), 2246822507) + 0x9e3779b9) | 0;
+    return ((h >>> 0) % 10000) / 10000;
+  };
+}
+
+// Riwayat permintaan mingguan (12 minggu) dari data dummy + penjualan yang tercatat
+function buildWeeklyDemand(product, movements) {
+  const rand = seededRandom(product.id);
+  const base = Math.max(0.5, (Number(product.soldCount) || 20) / 52);
+  const intermittent = base < 3 || product.categorySlug === 'bibit_pupuk';
+  const series = Array.from({ length: 12 }, () => {
+    if (intermittent && rand() < 0.45) return 0;
+    return Math.max(0, Math.round(base * (0.6 + rand() * 0.8)));
+  });
+  const sold = movements
+    .filter((m) => m.productId === product.id && m.type === 'OUT' && m.category === 'Penjualan Pesanan')
+    .reduce((s, m) => s + Math.abs(Number(m.quantity) || 0), 0);
+  series[11] += sold;
+  return { series, intermittent };
+}
+
+function stdDev(arr) {
+  const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+  return Math.sqrt(arr.reduce((s, x) => s + (x - mean) ** 2, 0) / arr.length);
+}
+
+// Kalkulasi Demand Forecast (ARIMA / Croston SBA) + Safety Stock + ROP, lalu update data
+export function runDemandForecast(productIds) {
+  const products = getStoredProducts();
+  const movements = getStoredMovements();
+  const existing = getStoredForecasts();
+  const targets = productIds && productIds.length ? products.filter((p) => productIds.includes(p.id)) : products;
+  const nowStr = new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' });
+  const Z = 1.645; // service level 95%
+
+  const results = targets.map((p) => {
+    const prev = existing.find((f) => f.productId === p.id);
+    const leadTimeDays = prev?.leadTimeDays || (p.categorySlug === 'bibit_pupuk' ? 4 : 2);
+    const { series, intermittent } = buildWeeklyDemand(p, movements);
+    let weekly;
+    let method;
+
+    if (intermittent) {
+      // Croston SBA: z/p * (1 - alpha/2)
+      const alpha = 0.1;
+      let z = null;
+      let pInt = null;
+      let q = 1;
+      series.forEach((d) => {
+        if (d > 0) {
+          z = z === null ? d : z + alpha * (d - z);
+          pInt = pInt === null ? q : pInt + alpha * (q - pInt);
+          q = 1;
+        } else q += 1;
+      });
+      weekly = z && pInt ? (z / pInt) * (1 - alpha / 2) : 0;
+      method = 'Croston SBA';
+    } else {
+      // ARIMA(1,1,0) sederhana: level terakhir + phi * perubahan terakhir
+      const diffs = series.slice(1).map((v, i) => v - series[i]);
+      const phi = 0.35;
+      const lastLevel = series.slice(-4).reduce((a, b) => a + b, 0) / 4;
+      weekly = Math.max(0, lastLevel + phi * (diffs[diffs.length - 1] || 0));
+      method = 'ARIMA (1,1,0)';
+    }
+
+    const sigma = stdDev(series);
+    const safetyStock = Math.ceil(Z * sigma * Math.sqrt(leadTimeDays / 7));
+    const reorderPoint = Math.ceil((weekly / 7) * leadTimeDays + safetyStock);
+    const w = (k) => Math.max(0, Math.round(weekly * (1 + 0.03 * k)));
+    const rmse = (sigma * 0.6).toFixed(2);
+
+    return {
+      productId: p.id,
+      productName: p.name,
+      category: p.category,
+      demandType: intermittent ? 'Intermiten / Sporadis' : 'Kontinu (Reguler)',
+      recommendedMethod: method,
+      history: series,
+      horizonW1: w(0),
+      horizonW2: w(1),
+      horizonW3: w(2),
+      horizonW4: w(3),
+      rmse,
+      safetyStock,
+      reorderPoint,
+      leadTimeDays,
+      serviceLevel: '95% (Z=1.645)',
+      status: 'AKTIF_TERUPDATE',
+      updatedAt: nowStr,
+    };
+  });
+
+  const merged = [...results, ...existing.filter((f) => !results.some((r) => r.productId === f.productId))];
+  saveStoredForecasts(merged);
+  return results;
+}
+
+// Generate & export laporan persediaan (CSV, bisa dibuka di Excel)
+export function exportInventoryReportCsv() {
+  const rows = getInventoryStatusList();
+  const header = ['Kode', 'Nama Produk', 'Kategori', 'Satuan', 'Stok Fisik', 'Direservasi', 'Stok Tersedia', 'Safety Stock', 'ROP', 'Metode Forecast', 'Forecast Minggu 1', 'Forecast 4 Minggu', 'Status'];
+  const lines = rows.map((r) => [
+    r.id,
+    r.name,
+    r.category,
+    r.unit,
+    r.stock,
+    r.reserved,
+    r.available,
+    r.safetyStock,
+    r.rop,
+    r.forecast?.recommendedMethod || '-',
+    r.forecast?.horizonW1 ?? '-',
+    r.forecast ? r.forecast.horizonW1 + r.forecast.horizonW2 + r.forecast.horizonW3 + r.forecast.horizonW4 : '-',
+    r.stockStatus === 'AMAN' ? 'Aman' : r.stockStatus === 'HABIS' ? 'Habis' : 'Perlu Restock',
+  ]);
+  downloadCsv(`laporan-persediaan-farm-berkah-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...lines]);
+  return rows.length;
+}
+
+export function downloadCsv(filename, rows) {
+  const csv = rows
+    .map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(';'))
+    .join('\n');
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
