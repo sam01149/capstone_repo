@@ -1132,3 +1132,8 @@ export function getProductsByCategory(categorySlug) {
   if (!categorySlug || categorySlug === 'all') return current;
   return current.filter((p) => p.categorySlug === categorySlug);
 }
+
+// Alias exports for compatibility and unified data folder
+export const INITIAL_PRODUCTS = PRODUCTS_CATALOG;
+export const PRODUCT_CATEGORIES = CATEGORIES;
+

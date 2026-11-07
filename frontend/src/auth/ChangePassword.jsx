@@ -8,7 +8,7 @@ import {
   Lock,
   X,
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from './AuthContext';
 
 export default function ChangePassword({ onPasswordChanged, onLogout }) {
   const { user, completeForceChangePassword, logout } = useAuth();

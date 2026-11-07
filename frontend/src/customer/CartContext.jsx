@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { formatRupiah } from '../utils/formatters';
-import { orderService } from '../services/orderService';
-import { OFFICIAL_STORE_INFO } from '../mocks/ordersAndInventoryData';
+import { formatRupiah } from '../data/formatters';
+import { OFFICIAL_STORE_INFO, saveDraftInvoice } from '../data/ordersAndInventoryData';
+import { sendNotification } from '../sales-admin/NotificationContext';
 
 const CartContext = createContext(null);
 
@@ -130,7 +130,7 @@ export function CartProvider({ children }) {
 
     // Auto-save draft for Sales Admin Inbox
     for (const item of cartItems) {
-      await orderService.saveDraftInvoice({
+      saveDraftInvoice({
         invoiceNo: draftInvoiceNo,
         customerName: customerData.name,
         customerPhone: customerData.phone,
@@ -142,6 +142,13 @@ export function CartProvider({ children }) {
         subtotal: item.subtotal,
         date: now.toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' }),
         messageSnippet: `Pesanan ${item.productName} (${item.quantity} unit) dari ${customerData.name}`,
+      });
+      sendNotification({
+        roleTarget: 'SALES_ADMIN',
+        title: 'Pesanan Masuk via WhatsApp',
+        message: `${customerData.name} mengirim pesanan ${item.productName} (${item.quantity} unit).`,
+        type: 'INFO',
+        link: '/sales/inbox',
       });
     }
 

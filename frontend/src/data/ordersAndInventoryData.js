@@ -114,6 +114,82 @@ export const DUMMY_TRANSFER_PROOFS = [
   },
 ];
 
+export const OFFICIAL_STORE_INFO = {
+  name: 'UMKM Toko Farm Berkah',
+  tagline: 'Produk Olahan Pertanian Alami & Higienis Pulo Gebang',
+  address: 'Perumahan Komplek Masnaga, Kel. Pulo Gebang, Kec. Cakung, Jakarta Timur, DKI Jakarta 13950',
+  phone: '0812-1614-6510',
+  phoneRaw: '6281216146510',
+  email: 'admin@farmberkah.com',
+  qrisNmid: 'ID1026508798372',
+  qrisMerchantName: 'TOKO FARM BERKAH',
+  qrisImageUrl: '/images/qris-farm-berkah.jpg',
+};
+
+export const INITIAL_DRAFTS = [
+  {
+    invoiceNo: 'DRAFT-INV-20261106-441',
+    customerName: 'Ibu Ningsih',
+    customerPhone: '0813-8899-0011',
+    customerAddress: 'Komplek Era Mas 2000 Pulo Gebang',
+    productId: 'KERIPIK-LABU',
+    productName: 'KERIPIK LABU',
+    quantity: 3,
+    unitPrice: 15000,
+    subtotal: 45000,
+    date: '6 Nov 2026, 09:15 WIB',
+    messageSnippet: 'Halo kak mau pesan Keripik Labu 3 bungkus alamat Komplek Era Mas 2000 ya',
+  },
+];
+
+export const HISTORICAL_DEMAND = [
+  { month: 'Nov 2025', 'KERIPIK-LABU': 80, 'BAYAM': 25, 'ES-TELANG': 120, 'BAWANG-MERAH': 50 },
+  { month: 'Des 2025', 'KERIPIK-LABU': 95, 'BAYAM': 40, 'ES-TELANG': 150, 'BAWANG-MERAH': 65 },
+  { month: 'Jan 2026', 'KERIPIK-LABU': 70, 'BAYAM': 15, 'ES-TELANG': 110, 'BAWANG-MERAH': 45 },
+  { month: 'Feb 2026', 'KERIPIK-LABU': 85, 'BAYAM': 20, 'ES-TELANG': 130, 'BAWANG-MERAH': 55 },
+  { month: 'Mar 2026', 'KERIPIK-LABU': 110, 'BAYAM': 50, 'ES-TELANG': 170, 'BAWANG-MERAH': 75 },
+  { month: 'Apr 2026', 'KERIPIK-LABU': 125, 'BAYAM': 60, 'ES-TELANG': 190, 'BAWANG-MERAH': 80 },
+  { month: 'Mei 2026', 'KERIPIK-LABU': 90, 'BAYAM': 25, 'ES-TELANG': 140, 'BAWANG-MERAH': 60 },
+  { month: 'Jun 2026', 'KERIPIK-LABU': 95, 'BAYAM': 30, 'ES-TELANG': 150, 'BAWANG-MERAH': 65 },
+  { month: 'Jul 2026', 'KERIPIK-LABU': 105, 'BAYAM': 35, 'ES-TELANG': 165, 'BAWANG-MERAH': 70 },
+  { month: 'Agu 2026', 'KERIPIK-LABU': 115, 'BAYAM': 45, 'ES-TELANG': 180, 'BAWANG-MERAH': 75 },
+  { month: 'Sep 2026', 'KERIPIK-LABU': 100, 'BAYAM': 30, 'ES-TELANG': 155, 'BAWANG-MERAH': 68 },
+  { month: 'Okt 2026', 'KERIPIK-LABU': 120, 'BAYAM': 40, 'ES-TELANG': 195, 'BAWANG-MERAH': 82 },
+];
+
+export const INITIAL_NOTIFICATIONS = [
+  {
+    id: 'NOTIF-001',
+    roleTarget: 'STOCK_MANAGER',
+    title: 'Peringatan Stok Rendah (≤ ROP)',
+    message: 'Produk Es Telang tersisa 8 botol (Batas ROP: 16 botol). Segera jadwalkan produksi restock.',
+    type: 'WARNING',
+    isRead: false,
+    timestamp: '2026-11-06 08:00',
+    link: '/inventory/restock',
+  },
+  {
+    id: 'NOTIF-002',
+    roleTarget: 'STOCK_MANAGER',
+    title: 'Stok Kritis (≤ Safety Stock)',
+    message: 'Bawang Merah Goreng tersisa 5 toples di gudang (Safety Stock: 8 toples). Pengadaan darurat disarankan.',
+    type: 'DANGER',
+    isRead: false,
+    timestamp: '2026-11-06 07:30',
+    link: '/inventory/restock',
+  },
+  {
+    id: 'NOTIF-003',
+    roleTarget: 'SALES_ADMIN',
+    title: 'Pesanan Masuk via WhatsApp',
+    message: 'Pesan pemesanan baru dari Ibu Ningsih (Keripik Labu 3 pcs). Klik untuk buat order resmi.',
+    type: 'INFO',
+    isRead: false,
+    timestamp: '2026-11-06 09:15',
+    link: '/sales/inbox',
+  },
+];
+
 // Initial Orders: Dikosongkan sesuai permintaan pengguna (hanya diisi pesanan masuk riil/simulasi WhatsApp)
 export const INITIAL_ORDERS = [];
 

@@ -10,7 +10,7 @@ import {
   Lock,
   MessageSquare,
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../auth/AuthContext';
 import { ROLES, dummyHashPassword } from '../data/mockAuth';
 
 export default function ManajemenAkun({

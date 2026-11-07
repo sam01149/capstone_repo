@@ -21,7 +21,14 @@ import {
   markQrisSent,
   submitTransferProof,
   verifyAndConfirmPayment,
+  getStoredOrders,
+  saveDraftInvoice,
 } from '../data/ordersAndInventoryData';
+
+export const orderService = {
+  getOrders: async () => getStoredOrders(),
+  saveDraftInvoice: async (draft) => saveDraftInvoice(draft),
+};
 
 // ============================================================================
 // STYLING CSS TERPADU SALES ADMIN & PORTAL STAF

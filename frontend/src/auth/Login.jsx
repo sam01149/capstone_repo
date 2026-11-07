@@ -6,7 +6,7 @@ import {
   AlertCircle,
   X,
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from './AuthContext';
 import LupaPassword from './LupaPassword';
 
 export default function Login({ onBackToCatalog, onBackToHome, onLoginSuccess, onRequirePasswordChange }) {

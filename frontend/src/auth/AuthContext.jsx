@@ -1,7 +1,48 @@
-import { INITIAL_USERS, INITIAL_AUDIT_LOGS, simpleHash } from '../mocks/usersData';
-import { ROLES } from '../types';
-import { delay, setAuthToken, request, USE_REAL_BACKEND } from './apiClient';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { INITIAL_USERS, INITIAL_AUDIT_LOGS, simpleHash } from '../data/usersData';
+import { ROLES } from '../data/types';
 
+// ============================================================================
+// API & STORAGE CLIENT CONFIGURATION
+// ============================================================================
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api/v1';
+export const USE_REAL_BACKEND = false; // Toggle to true when backend API is connected
+export const delay = (ms = 180) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export function getAuthToken() {
+  return localStorage.getItem('farmsight_jwt_token');
+}
+
+export function setAuthToken(token) {
+  if (token) {
+    localStorage.setItem('farmsight_jwt_token', token);
+  } else {
+    localStorage.removeItem('farmsight_jwt_token');
+  }
+}
+
+export async function request(endpoint, options = {}) {
+  if (USE_REAL_BACKEND) {
+    const token = getAuthToken();
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    };
+    const res = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.message || `HTTP ${res.status}: ${res.statusText}`);
+    }
+    return res.json();
+  }
+  await delay();
+  return null;
+}
+
+// ============================================================================
+// AUTENTIKASI & MANAJEMEN AKUN LOGIC
+// ============================================================================
 const STORAGE_USERS = 'farmsight_users_db_v1';
 const STORAGE_LOGS = 'farmsight_audit_logs_v1';
 const STORAGE_SESSION = 'farmsight_session_user';
@@ -89,7 +130,6 @@ export const authService = {
       saveLocalUsers(users);
     }
 
-    // Match by email, secondaryEmail, username prefix, or role keywords
     const cleanInput = (email || '').toLowerCase().trim();
     const cleanPass = String(password || '').trim();
 
@@ -125,14 +165,10 @@ export const authService = {
       const cleanP = String(pass).trim();
       const pLower = cleanP.toLowerCase();
 
-      // 1. Direct match with current active password (including custom changed password)
       if (u.password === cleanP || u.password === pass) return true;
       if (u.password && String(u.password).trim().toLowerCase() === pLower) return true;
-
-      // 2. Alt passwords list
       if (Array.isArray(u.altPasswords) && u.altPasswords.includes(cleanP)) return true;
 
-      // 3. Fallback demo seeds for roles (Super Admin, Stock Manager, Sales Admin)
       const uRole = String(u.role || '').toUpperCase();
       if (uRole.includes('SUPER') || u.id === 'USR-001' || u.id === 'USR-001B') {
         if (pLower === 'admin1234' || pLower === 'admin123' || pLower === 'admin' || pLower === 'admin12345' || pLower === 'adminfarm2026!') {
@@ -176,7 +212,6 @@ export const authService = {
       );
     });
 
-    // Fallback search in INITIAL_USERS if user not found in local array
     if (!user) {
       user = INITIAL_USERS.find((u) => {
         const emailLower = (u.email || '').toLowerCase();
@@ -202,13 +237,11 @@ export const authService = {
       throw new Error('Alamat email atau kata sandi salah. Silakan periksa kembali kredensial Anda.');
     }
 
-    // Super Admin pemilik sistem selalu aktif
     const isSuper = (user.role === 'SUPER_ADMIN' || user.role === ROLES.SUPER_ADMIN || user.id === 'USR-001' || user.id === 'USR-001B');
     if (isSuper) {
       user.isActive = true;
     }
 
-    // Jika akun berstatus Nonaktif, akun tidak bisa digunakan untuk login
     if (!isSuper && (user.isActive === false || user.status === 'Nonaktif')) {
       throw new Error('Akun staf Anda berstatus Nonaktif oleh Super Admin. Tidak dapat digunakan untuk login.');
     }
@@ -218,7 +251,6 @@ export const authService = {
       throw new Error('Alamat email atau kata sandi salah. Silakan periksa kembali kredensial Anda.');
     }
 
-    // Update last login
     user.lastLogin = new Date().toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' }) + ' WIB';
     saveLocalUsers(users);
 
@@ -227,7 +259,6 @@ export const authService = {
     localStorage.setItem(STORAGE_SESSION, JSON.stringify(safeUser));
     setAuthToken('mock_jwt_token_' + user.id);
 
-    // Record audit log
     this.recordAuditLog(user.name, 'LOGIN_SUCCESS', 'Autentikasi', `Berhasil login ke role ${user.role}`);
 
     return safeUser;
@@ -280,7 +311,6 @@ export const authService = {
     user.hasChangedPassword = true;
     saveLocalUsers(users);
 
-    // Update current session
     const current = this.getCurrentUser();
     if (current && current.id === userId) {
       current.must_change_password = false;
@@ -310,7 +340,6 @@ export const authService = {
     const existing = users.find((u) => u.email.toLowerCase() === email.toLowerCase().trim());
     if (existing) throw new Error('Email staf sudah terdaftar.');
 
-    // Generate temporary password
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$';
     let tempPass = 'FB-';
     for (let i = 0; i < 6; i++) {
@@ -328,7 +357,7 @@ export const authService = {
       phone: phone || '-',
       isActive: true,
       status: 'Aktif',
-      must_change_password: true, // Wajib ganti saat login pertama!
+      must_change_password: true,
       lastLogin: 'Belum pernah login',
       createdAt: new Date().toISOString().slice(0, 10),
     };
@@ -359,7 +388,7 @@ export const authService = {
 
     user.password = tempPass;
     user.passwordHash = simpleHash(tempPass);
-    user.must_change_password = true; // Wajib ganti saat login berikutnya!
+    user.must_change_password = true;
     saveLocalUsers(users);
 
     this.recordAuditLog('Super Admin', 'RESET_PASSWORD', 'Manajemen Akun', `Reset kata sandi staf: ${user.name}. must_change_password=true diset.`);
@@ -422,3 +451,192 @@ export const authService = {
   },
 };
 
+// ============================================================================
+// REACT CONTEXT & HOOK PROVIDER
+// ============================================================================
+const AuthContext = createContext(null);
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(() => authService.getCurrentUser());
+  const [loading, setLoading] = useState(false);
+  const [idleNotice, setIdleNotice] = useState(false);
+  const [users, setUsers] = useState(() => {
+    try {
+      const stored = localStorage.getItem('farmsight_users_db_v1');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((u) => (u.name === 'Bambang Sudarsono' ? { ...u, name: 'Ibu Intan Permatasari', roleTitle: 'Pemilik Toko (Super Admin)', avatar: 'IP' } : u));
+        }
+      }
+    } catch {
+      // fallback
+    }
+    return INITIAL_USERS;
+  });
+  const idleTimeoutRef = useRef(null);
+
+  const syncUsers = useCallback(async () => {
+    try {
+      const u = await authService.getUsers();
+      if (Array.isArray(u) && u.length > 0) {
+        setUsers(u);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    syncUsers();
+    const handleStorage = () => syncUsers();
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('farmsight_users_updated', handleStorage);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('farmsight_users_updated', handleStorage);
+    };
+  }, [syncUsers]);
+
+  const resetIdleTimer = useCallback(() => {
+    if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
+    if (!user) return;
+
+    idleTimeoutRef.current = setTimeout(() => {
+      authService.logout();
+      setUser(null);
+      setIdleNotice(true);
+    }, 15 * 60 * 1000);
+  }, [user]);
+
+  useEffect(() => {
+    const events = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
+    const handleUserActivity = () => resetIdleTimer();
+
+    events.forEach((ev) => window.addEventListener(ev, handleUserActivity));
+    resetIdleTimer();
+
+    return () => {
+      events.forEach((ev) => window.removeEventListener(ev, handleUserActivity));
+      if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
+    };
+  }, [resetIdleTimer]);
+
+  const login = async (email, password) => {
+    try {
+      sessionStorage.removeItem('sales_admin_active_tab');
+      sessionStorage.removeItem('super_admin_active_tab');
+      sessionStorage.removeItem('stock_manager_active_tab');
+    } catch {
+      // ignore
+    }
+    const loggedUser = await authService.login(email, password);
+    setUser(loggedUser);
+    setIdleNotice(false);
+    return loggedUser;
+  };
+
+  const logout = async () => {
+    try {
+      sessionStorage.removeItem('sales_admin_active_tab');
+      sessionStorage.removeItem('super_admin_active_tab');
+      sessionStorage.removeItem('stock_manager_active_tab');
+    } catch {
+      // ignore
+    }
+    await authService.logout();
+    setUser(null);
+  };
+
+  const completeForceChangePassword = async (newPassword) => {
+    if (!user) return;
+    const updated = await authService.changePassword(user.id, newPassword);
+    setUser({ ...user, must_change_password: false });
+    await syncUsers();
+    return updated;
+  };
+
+  const createUser = async (userData) => {
+    const res = await authService.createUser(userData);
+    await syncUsers();
+    return res;
+  };
+
+  const updateUser = async (userId, data) => {
+    const res = await authService.updateUser(userId, data);
+    await syncUsers();
+    return res;
+  };
+
+  const toggleUserStatus = async (userId) => {
+    const res = await authService.toggleUserStatus(userId);
+    await syncUsers();
+    return res;
+  };
+
+  const adminResetUserPassword = async (userId, customPassword) => {
+    let res;
+    if (customPassword && customPassword.trim()) {
+      res = await authService.changePassword(userId, customPassword.trim());
+      await authService.updateUser(userId, { must_change_password: true });
+      const currentList = await authService.getUsers();
+      const updatedUser = currentList.find((u) => u.id === userId) || res;
+      await syncUsers();
+      return {
+        updatedUser,
+        user: updatedUser,
+        tempPassword: customPassword.trim(),
+      };
+    } else {
+      res = await authService.resetPassword(userId);
+      await syncUsers();
+      return {
+        updatedUser: res.user,
+        user: res.user,
+        tempPassword: res.tempPassword,
+      };
+    }
+  };
+
+  const value = {
+    user,
+    role: user?.role || ROLES.GUEST,
+    isAuthenticated: !!user,
+    loading,
+    idleNotice,
+    dismissIdleNotice: () => setIdleNotice(false),
+    login,
+    logout,
+    completeForceChangePassword,
+    users,
+    createUser,
+    updateUser,
+    toggleUserStatus,
+    adminResetUserPassword,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    return {
+      user: null,
+      role: null,
+      isAuthenticated: false,
+      loading: false,
+      idleNotice: false,
+      dismissIdleNotice: () => {},
+      login: async () => {},
+      logout: async () => {},
+      completeForceChangePassword: async () => {},
+      users: [],
+      createUser: async () => ({}),
+      updateUser: async () => ({}),
+      toggleUserStatus: async () => ({}),
+      adminResetUserPassword: async () => ({}),
+    };
+  }
+  return ctx;
+}

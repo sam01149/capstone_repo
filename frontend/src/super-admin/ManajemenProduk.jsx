@@ -7,12 +7,23 @@ import {
   Trash2,
   Eye,
   EyeOff,
+  AlertCircle,
+  HelpCircle,
+  Check,
+  X,
 } from 'lucide-react';
 import {
   formatRupiah,
+  getStoredProducts,
   saveStoredProducts,
   toggleProductVisibility,
 } from '../data/productsData';
+
+export const productService = {
+  getProducts: async () => getStoredProducts(),
+  saveProducts: async (prods) => saveStoredProducts(prods),
+  toggleVisibility: async (id) => toggleProductVisibility(id),
+};
 
 export const CATEGORY_OPTIONS = [
   { slug: 'camilan', name: 'Camilan & Keripik', badge: 'Camilan Sehat', color: '#9a3412', bg: '#ffedd5' },
@@ -38,10 +49,13 @@ export default function ManajemenProduk({
   const [prodVisibilityFilter, setProdVisibilityFilter] = useState('ALL'); // 'ALL' | 'VISIBLE' | 'HIDDEN'
   const [editingProduct, setEditingProduct] = useState(null);
 
+  const [formErrors, setFormErrors] = useState({});
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
   const [prodFormData, setProdFormData] = useState({
     id: '',
     name: '',
-    categorySlug: 'camilan',
+    categorySlug: '',
     price: '',
     unit: '',
     stock: '',
@@ -58,7 +72,7 @@ export default function ManajemenProduk({
     setProdFormData({
       id: '',
       name: '',
-      categorySlug: 'camilan',
+      categorySlug: '',
       price: '',
       unit: '',
       stock: '',
@@ -69,6 +83,8 @@ export default function ManajemenProduk({
       badge: '',
       visibility: 'visible',
     });
+    setFormErrors({});
+    setShowConfirmModal(false);
     setProdViewMode('form');
   };
 
@@ -88,31 +104,65 @@ export default function ManajemenProduk({
       badge: p.badge || '',
       visibility: p.visibility || (p.isAvailable !== false ? 'visible' : 'hidden'),
     });
+    setFormErrors({});
+    setShowConfirmModal(false);
     setProdViewMode('form');
   };
 
   const handleProductSubmit = (e) => {
     e.preventDefault();
-    if (!prodFormData.name.trim() || !prodFormData.price) {
-      if (showToast) showToast('Harap lengkapi nama produk dan harga.');
+
+    // Validasi ketat: semua kolom data produk wajib diisi lengkap oleh Super Admin
+    const errors = {};
+    if (!prodFormData.id?.trim()) errors.id = 'Kode SKU wajib diisi';
+    if (!prodFormData.name?.trim()) errors.name = 'Nama produk wajib diisi';
+    if (!prodFormData.categorySlug) errors.categorySlug = 'Kategori produk wajib dipilih';
+    if (!String(prodFormData.price ?? '').trim() || isNaN(Number(prodFormData.price)) || Number(prodFormData.price) <= 0) {
+      errors.price = 'Harga satuan wajib diisi angka valid lebih dari 0';
+    }
+    if (!prodFormData.unit?.trim()) errors.unit = 'Satuan/unit wajib diisi (misal: Pcs, Botol, Ikat)';
+    if (prodFormData.stock === '' || prodFormData.stock === null || isNaN(Number(prodFormData.stock)) || Number(prodFormData.stock) < 0) {
+      errors.stock = 'Stok awal wajib diisi angka valid (minimal 0)';
+    }
+    if (prodFormData.minStock === '' || prodFormData.minStock === null || isNaN(Number(prodFormData.minStock)) || Number(prodFormData.minStock) < 0) {
+      errors.minStock = 'Batas min. stok (ROP) wajib diisi angka valid (minimal 0)';
+    }
+    if (!prodFormData.badge?.trim()) errors.badge = 'Label/badge wajib diisi (misal: Produk Baru, Panen Segar)';
+    if (!prodFormData.image?.trim()) errors.image = 'URL foto produk wajib diisi';
+    if (!prodFormData.description?.trim()) errors.description = 'Deskripsi singkat produk wajib diisi';
+    if (!prodFormData.composition?.trim()) errors.composition = 'Komposisi bahan baku produk wajib diisi';
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      if (showToast) {
+        showToast('⚠️ Gagal menyimpan: Semua kolom data produk wajib diisi lengkap sebelum disimpan!');
+      }
       return;
     }
 
+    setFormErrors({});
+    // Buka modal konfirmasi Ya / Tidak
+    setShowConfirmModal(true);
+  };
+
+  const handleExecuteSave = () => {
     const catObj = CATEGORY_OPTIONS.find((c) => c.slug === prodFormData.categorySlug) || CATEGORY_OPTIONS[0];
     const numPrice = Number(prodFormData.price);
-    const numStock = Number(prodFormData.stock || 0);
-    const numMin = Number(prodFormData.minStock || 10);
+    const numStock = Number(prodFormData.stock);
+    const numMin = Number(prodFormData.minStock);
     const isVis = prodFormData.visibility === 'visible';
-    const finalId = (prodFormData.id && prodFormData.id.trim())
-      ? prodFormData.id.trim()
-      : (editingProduct ? editingProduct.id : `PROD-${String(products.length + 1).padStart(3, '0')}`);
+    const finalId = prodFormData.id.trim();
 
     const payload = {
       ...prodFormData,
       id: finalId,
-      unit: prodFormData.unit?.trim() || 'Pcs',
-      badge: prodFormData.badge?.trim() || 'Produk Baru',
-      image: prodFormData.image?.trim() || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=80',
+      sku: finalId,
+      name: prodFormData.name.trim(),
+      unit: prodFormData.unit.trim(),
+      badge: prodFormData.badge.trim(),
+      image: prodFormData.image.trim(),
+      description: prodFormData.description.trim(),
+      composition: prodFormData.composition.trim(),
       visibility: prodFormData.visibility || 'visible',
       isAvailable: isVis,
       price: numPrice,
@@ -131,14 +181,16 @@ export default function ManajemenProduk({
     let updated;
     if (editingProduct) {
       updated = products.map((p) => (p.id === editingProduct.id ? payload : p));
-      if (showToast) showToast(`Produk "${payload.name}" berhasil diperbarui! Status visibilitas: ${isVis ? 'Tampil di Publik' : 'Disembunyikan'}. Database diperbarui, proses selesai.`);
+      if (showToast) showToast(`Produk "${payload.name}" berhasil diperbarui! Status visibilitas: ${isVis ? 'Tampil di Publik' : 'Disembunyikan'}.`);
     } else {
       updated = [payload, ...products];
-      if (showToast) showToast(`Produk baru "${payload.name}" berhasil ditambahkan! Status visibilitas: ${isVis ? 'Tampil di Publik' : 'Disembunyikan'}. Database diperbarui, proses selesai.`);
+      if (showToast) showToast(`Produk baru "${payload.name}" berhasil ditambahkan ke katalog!`);
     }
 
     if (setProducts) setProducts(updated);
     saveStoredProducts(updated);
+    setShowConfirmModal(false);
+    setFormErrors({});
     setProdViewMode('list');
   };
 
@@ -208,157 +260,359 @@ export default function ManajemenProduk({
             </button>
           </div>
 
-          <form onSubmit={handleProductSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          <form onSubmit={handleProductSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            {/* ALERT PERINGATAN BILA ADA KOLOM BELUM TERISI */}
+            {Object.keys(formErrors).length > 0 && (
+              <div
+                style={{
+                  backgroundColor: '#fef2f2',
+                  border: '1.5px solid #fecaca',
+                  borderRadius: '10px',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  color: '#991b1b',
+                  fontSize: '0.84rem',
+                  fontWeight: 700,
+                }}
+              >
+                <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                <span>Gagal menyimpan: Semua kolom bertanda bintang (*) wajib diisi lengkap oleh Super Admin sebelum disimpan!</span>
+              </div>
+            )}
+
             {/* BARIS 1: IDENTITAS PRODUK (3 KOLOM PROPORSIONAL) */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1.3fr', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                  Kode SKU {editingProduct ? '*' : '(Opsional)'}
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: formErrors.id ? '#dc2626' : '#334155', marginBottom: '6px' }}>
+                  Kode SKU *
                 </label>
                 <input
                   type="text"
                   value={prodFormData.id}
-                  onChange={(e) => setProdFormData({ ...prodFormData, id: e.target.value })}
+                  onChange={(e) => {
+                    setProdFormData({ ...prodFormData, id: e.target.value });
+                    if (formErrors.id) setFormErrors({ ...formErrors, id: '' });
+                  }}
                   disabled={!!editingProduct}
-                  placeholder={editingProduct ? 'PROD-xxx' : 'Contoh: PROD-001 (Otomatis bila kosong)'}
-                  style={{ width: '100%', height: '42px', padding: '0 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.86rem', fontFamily: 'monospace', boxSizing: 'border-box' }}
+                  placeholder="Contoh: PROD-044 / KER-001"
+                  style={{
+                    width: '100%',
+                    height: '42px',
+                    padding: '0 12px',
+                    borderRadius: '10px',
+                    border: formErrors.id ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                    backgroundColor: editingProduct ? '#f8fafc' : '#ffffff',
+                    fontSize: '0.86rem',
+                    fontFamily: 'monospace',
+                    boxSizing: 'border-box',
+                  }}
                 />
+                {formErrors.id && (
+                  <span style={{ color: '#ef4444', fontSize: '0.72rem', fontWeight: 600, marginTop: '3px', display: 'block' }}>
+                    {formErrors.id}
+                  </span>
+                )}
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: formErrors.name ? '#dc2626' : '#334155', marginBottom: '6px' }}>
                   Nama Produk *
                 </label>
                 <input
                   type="text"
-                  required
                   value={prodFormData.name}
-                  onChange={(e) => setProdFormData({ ...prodFormData, name: e.target.value })}
+                  onChange={(e) => {
+                    setProdFormData({ ...prodFormData, name: e.target.value });
+                    if (formErrors.name) setFormErrors({ ...formErrors, name: '' });
+                  }}
                   placeholder="Contoh: Keripik Labu Madu 150g"
-                  style={{ width: '100%', height: '42px', padding: '0 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
+                  style={{
+                    width: '100%',
+                    height: '42px',
+                    padding: '0 12px',
+                    borderRadius: '10px',
+                    border: formErrors.name ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                    fontSize: '0.86rem',
+                    boxSizing: 'border-box',
+                  }}
                 />
+                {formErrors.name && (
+                  <span style={{ color: '#ef4444', fontSize: '0.72rem', fontWeight: 600, marginTop: '3px', display: 'block' }}>
+                    {formErrors.name}
+                  </span>
+                )}
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                  Kategori Produk
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: formErrors.categorySlug ? '#dc2626' : '#334155', marginBottom: '6px' }}>
+                  Kategori Produk *
                 </label>
                 <select
                   value={prodFormData.categorySlug}
-                  onChange={(e) => setProdFormData({ ...prodFormData, categorySlug: e.target.value })}
-                  style={{ width: '100%', height: '42px', padding: '0 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.86rem', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
+                  onChange={(e) => {
+                    setProdFormData({ ...prodFormData, categorySlug: e.target.value });
+                    if (formErrors.categorySlug) setFormErrors({ ...formErrors, categorySlug: '' });
+                  }}
+                  style={{
+                    width: '100%',
+                    height: '42px',
+                    padding: '0 12px',
+                    borderRadius: '10px',
+                    border: formErrors.categorySlug ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                    fontSize: '0.86rem',
+                    backgroundColor: '#ffffff',
+                    boxSizing: 'border-box',
+                  }}
                 >
+                  <option value="">-- Pilih Kategori Produk --</option>
                   {CATEGORY_OPTIONS.map((c) => (
                     <option key={c.slug} value={c.slug}>{c.name}</option>
                   ))}
                 </select>
+                {formErrors.categorySlug && (
+                  <span style={{ color: '#ef4444', fontSize: '0.72rem', fontWeight: 600, marginTop: '3px', display: 'block' }}>
+                    {formErrors.categorySlug}
+                  </span>
+                )}
               </div>
             </div>
 
             {/* BARIS 2: KEUANGAN & STOK (4 KOLOM SEIMBANG) */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: formErrors.price ? '#dc2626' : '#334155', marginBottom: '6px' }}>
                   Harga Satuan (Rp) *
                 </label>
                 <input
                   type="number"
-                  required
                   value={prodFormData.price}
-                  onChange={(e) => setProdFormData({ ...prodFormData, price: e.target.value })}
+                  onChange={(e) => {
+                    setProdFormData({ ...prodFormData, price: e.target.value });
+                    if (formErrors.price) setFormErrors({ ...formErrors, price: '' });
+                  }}
                   placeholder="Contoh: 15000"
-                  style={{ width: '100%', height: '42px', padding: '0 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.86rem', fontWeight: 700, boxSizing: 'border-box' }}
+                  style={{
+                    width: '100%',
+                    height: '42px',
+                    padding: '0 12px',
+                    borderRadius: '10px',
+                    border: formErrors.price ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                    fontSize: '0.86rem',
+                    fontWeight: 700,
+                    boxSizing: 'border-box',
+                  }}
                 />
+                {formErrors.price && (
+                  <span style={{ color: '#ef4444', fontSize: '0.72rem', fontWeight: 600, marginTop: '3px', display: 'block' }}>
+                    {formErrors.price}
+                  </span>
+                )}
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                  Satuan / Unit
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: formErrors.unit ? '#dc2626' : '#334155', marginBottom: '6px' }}>
+                  Satuan / Unit *
                 </label>
                 <input
                   type="text"
                   value={prodFormData.unit}
-                  onChange={(e) => setProdFormData({ ...prodFormData, unit: e.target.value })}
-                  placeholder="Contoh: Pcs / Botol / Ikat"
-                  style={{ width: '100%', height: '42px', padding: '0 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
+                  onChange={(e) => {
+                    setProdFormData({ ...prodFormData, unit: e.target.value });
+                    if (formErrors.unit) setFormErrors({ ...formErrors, unit: '' });
+                  }}
+                  placeholder="Contoh: Pcs / Botol / Ikat / Pack"
+                  style={{
+                    width: '100%',
+                    height: '42px',
+                    padding: '0 12px',
+                    borderRadius: '10px',
+                    border: formErrors.unit ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                    fontSize: '0.86rem',
+                    boxSizing: 'border-box',
+                  }}
                 />
+                {formErrors.unit && (
+                  <span style={{ color: '#ef4444', fontSize: '0.72rem', fontWeight: 600, marginTop: '3px', display: 'block' }}>
+                    {formErrors.unit}
+                  </span>
+                )}
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                  Stok Awal
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: formErrors.stock ? '#dc2626' : '#334155', marginBottom: '6px' }}>
+                  Stok Awal *
                 </label>
                 <input
                   type="number"
                   value={prodFormData.stock}
-                  onChange={(e) => setProdFormData({ ...prodFormData, stock: e.target.value })}
+                  onChange={(e) => {
+                    setProdFormData({ ...prodFormData, stock: e.target.value });
+                    if (formErrors.stock) setFormErrors({ ...formErrors, stock: '' });
+                  }}
                   placeholder="Contoh: 50"
-                  style={{ width: '100%', height: '42px', padding: '0 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
+                  style={{
+                    width: '100%',
+                    height: '42px',
+                    padding: '0 12px',
+                    borderRadius: '10px',
+                    border: formErrors.stock ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                    fontSize: '0.86rem',
+                    boxSizing: 'border-box',
+                  }}
                 />
+                {formErrors.stock && (
+                  <span style={{ color: '#ef4444', fontSize: '0.72rem', fontWeight: 600, marginTop: '3px', display: 'block' }}>
+                    {formErrors.stock}
+                  </span>
+                )}
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                  Batas Min. Stok (ROP)
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: formErrors.minStock ? '#dc2626' : '#334155', marginBottom: '6px' }}>
+                  Batas Min. Stok (ROP) *
                 </label>
                 <input
                   type="number"
                   value={prodFormData.minStock}
-                  onChange={(e) => setProdFormData({ ...prodFormData, minStock: e.target.value })}
+                  onChange={(e) => {
+                    setProdFormData({ ...prodFormData, minStock: e.target.value });
+                    if (formErrors.minStock) setFormErrors({ ...formErrors, minStock: '' });
+                  }}
                   placeholder="Contoh: 10"
-                  style={{ width: '100%', height: '42px', padding: '0 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
+                  style={{
+                    width: '100%',
+                    height: '42px',
+                    padding: '0 12px',
+                    borderRadius: '10px',
+                    border: formErrors.minStock ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                    fontSize: '0.86rem',
+                    boxSizing: 'border-box',
+                  }}
                 />
+                {formErrors.minStock && (
+                  <span style={{ color: '#ef4444', fontSize: '0.72rem', fontWeight: 600, marginTop: '3px', display: 'block' }}>
+                    {formErrors.minStock}
+                  </span>
+                )}
               </div>
             </div>
 
             {/* BARIS 3: LABEL & URL FOTO (2 KOLOM SEIMBANG) */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 2.3fr', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                  Label / Badge
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: formErrors.badge ? '#dc2626' : '#334155', marginBottom: '6px' }}>
+                  Label / Badge *
                 </label>
                 <input
                   type="text"
                   value={prodFormData.badge}
-                  onChange={(e) => setProdFormData({ ...prodFormData, badge: e.target.value })}
+                  onChange={(e) => {
+                    setProdFormData({ ...prodFormData, badge: e.target.value });
+                    if (formErrors.badge) setFormErrors({ ...formErrors, badge: '' });
+                  }}
                   placeholder="Contoh: Produk Baru / Panen Segar"
-                  style={{ width: '100%', height: '42px', padding: '0 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
+                  style={{
+                    width: '100%',
+                    height: '42px',
+                    padding: '0 12px',
+                    borderRadius: '10px',
+                    border: formErrors.badge ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                    fontSize: '0.86rem',
+                    boxSizing: 'border-box',
+                  }}
                 />
+                {formErrors.badge && (
+                  <span style={{ color: '#ef4444', fontSize: '0.72rem', fontWeight: 600, marginTop: '3px', display: 'block' }}>
+                    {formErrors.badge}
+                  </span>
+                )}
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                  URL Foto Produk
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: formErrors.image ? '#dc2626' : '#334155', marginBottom: '6px' }}>
+                  URL Foto Produk *
                 </label>
                 <input
                   type="text"
                   value={prodFormData.image}
-                  onChange={(e) => setProdFormData({ ...prodFormData, image: e.target.value })}
+                  onChange={(e) => {
+                    setProdFormData({ ...prodFormData, image: e.target.value });
+                    if (formErrors.image) setFormErrors({ ...formErrors, image: '' });
+                  }}
                   placeholder="Contoh: https://images.unsplash.com/..."
-                  style={{ width: '100%', height: '42px', padding: '0 12px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box' }}
+                  style={{
+                    width: '100%',
+                    height: '42px',
+                    padding: '0 12px',
+                    borderRadius: '10px',
+                    border: formErrors.image ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                    fontSize: '0.86rem',
+                    boxSizing: 'border-box',
+                  }}
                 />
+                {formErrors.image && (
+                  <span style={{ color: '#ef4444', fontSize: '0.72rem', fontWeight: 600, marginTop: '3px', display: 'block' }}>
+                    {formErrors.image}
+                  </span>
+                )}
               </div>
             </div>
 
             {/* BARIS 4: DESKRIPSI & KOMPOSISI BAHAN BAKU (2 KOLOM SEIMBANG) */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                  Deskripsi Singkat Produk
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: formErrors.description ? '#dc2626' : '#334155', marginBottom: '6px' }}>
+                  Deskripsi Singkat Produk *
                 </label>
                 <textarea
                   rows={3}
                   value={prodFormData.description}
-                  onChange={(e) => setProdFormData({ ...prodFormData, description: e.target.value })}
+                  onChange={(e) => {
+                    setProdFormData({ ...prodFormData, description: e.target.value });
+                    if (formErrors.description) setFormErrors({ ...formErrors, description: '' });
+                  }}
                   placeholder="Jelaskan keunggulan, cita rasa, dan spesifikasi produk ini..."
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box', lineHeight: 1.5, resize: 'vertical' }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '10px',
+                    border: formErrors.description ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                    fontSize: '0.86rem',
+                    boxSizing: 'border-box',
+                    lineHeight: 1.5,
+                    resize: 'vertical',
+                  }}
                 />
+                {formErrors.description && (
+                  <span style={{ color: '#ef4444', fontSize: '0.72rem', fontWeight: 600, marginTop: '3px', display: 'block' }}>
+                    {formErrors.description}
+                  </span>
+                )}
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                  Komposisi Bahan Baku
+                <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 700, color: formErrors.composition ? '#dc2626' : '#334155', marginBottom: '6px' }}>
+                  Komposisi Bahan Baku *
                 </label>
                 <textarea
                   rows={3}
                   value={prodFormData.composition}
-                  onChange={(e) => setProdFormData({ ...prodFormData, composition: e.target.value })}
+                  onChange={(e) => {
+                    setProdFormData({ ...prodFormData, composition: e.target.value });
+                    if (formErrors.composition) setFormErrors({ ...formErrors, composition: '' });
+                  }}
                   placeholder="Contoh: Rimpang kencur pilihan, beras sangrai, jahe segar, gula kelapa..."
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '0.86rem', boxSizing: 'border-box', lineHeight: 1.5, resize: 'vertical' }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '10px',
+                    border: formErrors.composition ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
+                    fontSize: '0.86rem',
+                    boxSizing: 'border-box',
+                    lineHeight: 1.5,
+                    resize: 'vertical',
+                  }}
                 />
+                {formErrors.composition && (
+                  <span style={{ color: '#ef4444', fontSize: '0.72rem', fontWeight: 600, marginTop: '3px', display: 'block' }}>
+                    {formErrors.composition}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -435,7 +689,11 @@ export default function ManajemenProduk({
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
               <button
                 type="button"
-                onClick={() => setProdViewMode('list')}
+                onClick={() => {
+                  setFormErrors({});
+                  setShowConfirmModal(false);
+                  setProdViewMode('list');
+                }}
                 style={{ padding: '11px 24px', borderRadius: '10px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', color: '#475569', fontWeight: 700, fontSize: '0.88rem', cursor: 'pointer' }}
               >
                 Batal
@@ -448,6 +706,162 @@ export default function ManajemenProduk({
               </button>
             </div>
           </form>
+
+          {/* MODAL POPUP KONFIRMASI SIMPAN PRODUK (YA / TIDAK) */}
+          {showConfirmModal && (
+            <div
+              style={{
+                position: 'fixed',
+                inset: 0,
+                backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                backdropFilter: 'blur(4px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 9999,
+                padding: '16px',
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: '16px',
+                  maxWidth: '520px',
+                  width: '100%',
+                  boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                  border: '1px solid #e2e8f0',
+                  overflow: 'hidden',
+                  animation: 'fadeIn 0.2s ease-out',
+                }}
+              >
+                {/* Header Modal */}
+                <div style={{ padding: '24px 24px 16px 24px', display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+                  <div
+                    style={{
+                      width: '46px',
+                      height: '46px',
+                      borderRadius: '12px',
+                      backgroundColor: '#dcfce7',
+                      color: '#15803d',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <HelpCircle size={26} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', margin: '0 0 6px 0' }}>
+                      {editingProduct ? 'Konfirmasi Simpan Perubahan Produk?' : 'Konfirmasi Simpan Produk Baru?'}
+                    </h3>
+                    <p style={{ fontSize: '0.84rem', color: '#64748b', margin: 0, lineHeight: 1.5 }}>
+                      Apakah Anda yakin data produk yang diinput sudah benar dan ingin menyimpannya ke dalam sistem katalog Toko Farm Berkah?
+                    </p>
+                  </div>
+                </div>
+
+                {/* Ringkasan Data yang Akan Disimpan */}
+                <div style={{ padding: '0 24px 20px 24px' }}>
+                  <div
+                    style={{
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      padding: '14px 16px',
+                      fontSize: '0.82rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#64748b' }}>Nama Produk:</span>
+                      <span style={{ fontWeight: 700, color: '#0f172a' }}>{prodFormData.name}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#64748b' }}>Kode SKU:</span>
+                      <span style={{ fontWeight: 700, fontFamily: 'monospace', color: '#0f172a' }}>{prodFormData.id}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#64748b' }}>Kategori:</span>
+                      <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                        {CATEGORY_OPTIONS.find((c) => c.slug === prodFormData.categorySlug)?.name || '-'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#64748b' }}>Harga Satuan:</span>
+                      <span style={{ fontWeight: 800, color: '#166534' }}>{formatRupiah(Number(prodFormData.price))}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#64748b' }}>Stok Awal & Satuan:</span>
+                      <span style={{ fontWeight: 700, color: '#0f172a' }}>{prodFormData.stock} {prodFormData.unit}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#64748b' }}>Batas Min. Stok (ROP):</span>
+                      <span style={{ fontWeight: 700, color: '#b45309' }}>{prodFormData.minStock} {prodFormData.unit}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#64748b' }}>Status Visibilitas:</span>
+                      <span style={{ fontWeight: 700, color: prodFormData.visibility === 'visible' ? '#16a34a' : '#dc2626' }}>
+                        {prodFormData.visibility === 'visible' ? 'Tampil di Publik' : 'Disembunyikan'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer Aksi: Batal / Tidak vs Ya, Simpan */}
+                <div
+                  style={{
+                    padding: '16px 24px',
+                    backgroundColor: '#f8fafc',
+                    borderTop: '1px solid #e2e8f0',
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    gap: '12px',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmModal(false)}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '10px',
+                      border: '1px solid #cbd5e1',
+                      backgroundColor: '#ffffff',
+                      color: '#475569',
+                      fontSize: '0.85rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Tidak, Periksa Lagi
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExecuteSave}
+                    style={{
+                      padding: '10px 24px',
+                      borderRadius: '10px',
+                      border: 'none',
+                      backgroundColor: '#1b4332',
+                      color: '#ffffff',
+                      fontSize: '0.85rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      boxShadow: '0 2px 6px rgba(27, 67, 50, 0.25)',
+                    }}
+                  >
+                    <Check size={16} />
+                    <span>Ya, Simpan Produk</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         /* TABEL DAFTAR PRODUK (LIST MODE) */

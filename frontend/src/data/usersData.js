@@ -1,4 +1,4 @@
-import { ROLES } from '../types';
+import { ROLES } from './types';
 
 export function simpleHash(str) {
   let hash = 0;

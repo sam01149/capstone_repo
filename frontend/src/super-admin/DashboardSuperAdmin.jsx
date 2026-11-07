@@ -17,7 +17,7 @@ import {
   Filter,
   MapPin,
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../auth/AuthContext';
 import { getStoredProducts, formatRupiah } from '../data/productsData';
 import { getStoredOrders, getStoredMovements } from '../data/ordersAndInventoryData';
 

@@ -27,7 +27,7 @@ import {
   ArrowRight,
   Filter,
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../auth/AuthContext';
 import { formatRupiah, getStoredProducts, cleanUnit, formatQtyUnit } from '../data/productsData';
 import {
   getStoredOrders,

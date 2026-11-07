@@ -37,7 +37,7 @@ import {
   CreditCard,
   QrCode,
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../auth/AuthContext';
 import {
   getStoredProducts,
   calculateCategories,

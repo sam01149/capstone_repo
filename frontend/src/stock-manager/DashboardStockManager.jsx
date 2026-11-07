@@ -18,7 +18,7 @@ import {
   ArrowRight,
   LayoutDashboard,
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../auth/AuthContext';
 import { getStoredProducts, saveStoredProducts, formatRupiah, formatStockUnit } from '../data/productsData';
 import {
   getStoredMovements,
@@ -26,6 +26,11 @@ import {
   getStoredForecasts,
   saveStoredForecasts,
 } from '../data/ordersAndInventoryData';
+
+export const inventoryService = {
+  getMovements: async () => getStoredMovements(),
+  getProducts: async () => getStoredProducts(),
+};
 
 // Import Halaman Aktivitas Sesuai Alur Flowchart Pengguna
 import BarangMasuk from './BarangMasuk';
