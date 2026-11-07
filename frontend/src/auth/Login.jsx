@@ -4,6 +4,7 @@ import {
   EyeOff,
   ArrowLeft,
   AlertCircle,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import LupaPassword from './LupaPassword';
@@ -13,26 +14,31 @@ export default function Login({ onBackToCatalog, onBackToHome, onLoginSuccess, o
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastKey, setToastKey] = useState(0);
   const [loading, setLoading] = useState(false);
   const [isForgotOpen, setIsForgotOpen] = useState(false);
 
-  // Auto-dismiss error message after 4 seconds
+  const showNotification = (msg) => {
+    setToastMessage(msg);
+    setToastKey((prev) => prev + 1);
+  };
+
+  // Auto-dismiss pemberitahuan setelah 3 detik
   useEffect(() => {
-    if (error) {
+    if (toastMessage) {
       const timer = setTimeout(() => {
-        setError('');
-      }, 4000);
+        setToastMessage('');
+      }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [error]);
+  }, [toastKey, toastMessage]);
 
   const handleSubmit = async (e) => {
-    if (e) e.preventDefault();
-    setError('');
+    if (e && e.preventDefault) e.preventDefault();
 
     if (!email.trim() || !password) {
-      setError('Harap masukkan alamat email dan kata sandi.');
+      showNotification('Email atau kata sandi tidak boleh kosong.');
       return;
     }
 
@@ -40,6 +46,9 @@ export default function Login({ onBackToCatalog, onBackToHome, onLoginSuccess, o
     try {
       const loggedInUser = await login(email, password);
       setLoading(false);
+
+      localStorage.setItem('farmsight_view', 'dashboard');
+      window.location.hash = '#/dashboard';
 
       if (loggedInUser?.must_change_password) {
         if (onRequirePasswordChange) {
@@ -53,8 +62,9 @@ export default function Login({ onBackToCatalog, onBackToHome, onLoginSuccess, o
         }
       }
     } catch (err) {
-      setError(err.message || 'Gagal masuk. Periksa email dan kata sandi Anda.');
       setLoading(false);
+      const errMsg = err?.message || 'Email atau kata sandi salah. Silakan coba lagi.';
+      showNotification(errMsg);
     }
   };
 
@@ -173,43 +183,14 @@ export default function Login({ onBackToCatalog, onBackToHome, onLoginSuccess, o
             Welcome back
           </h1>
 
-          {/* Error Message */}
-          {error && (
-            <div
-              style={{
-                marginBottom: '20px',
-                padding: '12px 14px',
-                borderRadius: '10px',
-                backgroundColor: '#fef2f2',
-                border: '1px solid #fee2e2',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                textAlign: 'left',
-              }}
-            >
-              <AlertCircle size={18} color="#dc2626" style={{ flexShrink: 0 }} />
-              <span
-                style={{
-                  fontSize: '0.85rem',
-                  color: '#b91c1c',
-                  lineHeight: 1.4,
-                }}
-              >
-                {error}
-              </span>
-            </div>
-          )}
-
           {/* Form Login */}
-          <form onSubmit={handleSubmit} style={{ textAlign: 'left' }}>
+          <form onSubmit={handleSubmit} noValidate style={{ textAlign: 'left' }}>
             {/* Input 1: Alamat Email / Username */}
             <div style={{ marginBottom: '16px' }}>
               <input
                 id="login-email"
                 type="text"
                 autoComplete="username"
-                required
                 placeholder="Alamat email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -242,7 +223,6 @@ export default function Login({ onBackToCatalog, onBackToHome, onLoginSuccess, o
                 id="login-password"
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="current-password"
-                required
                 placeholder="Kata sandi"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -373,6 +353,71 @@ export default function Login({ onBackToCatalog, onBackToHome, onLoginSuccess, o
         isOpen={isForgotOpen}
         onClose={() => setIsForgotOpen(false)}
       />
+
+      {/* Pemberitahuan Melayang Selama 3 Detik di Atas Layar */}
+      {toastMessage && (
+        <div
+          role="alert"
+          style={{
+            position: 'fixed',
+            top: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 999999,
+            backgroundColor: '#ffffff',
+            border: '1.5px solid #ef4444',
+            borderLeft: '5px solid #dc2626',
+            color: '#1f2937',
+            padding: '12px 20px',
+            borderRadius: '12px',
+            boxShadow: '0 12px 30px -5px rgba(220, 38, 38, 0.3), 0 4px 10px rgba(0, 0, 0, 0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            maxWidth: '92%',
+            fontSize: '0.88rem',
+            fontWeight: 600,
+            pointerEvents: 'auto',
+          }}
+        >
+          <div
+            style={{
+              width: '28px',
+              height: '28px',
+              borderRadius: '50%',
+              backgroundColor: '#fee2e2',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <AlertCircle size={18} color="#dc2626" />
+          </div>
+          <div>
+            <div style={{ color: '#991b1b', fontWeight: 700, fontSize: '0.8rem' }}>Pemberitahuan</div>
+            <div style={{ color: '#374151', fontSize: '0.86rem' }}>{toastMessage}</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setToastMessage('')}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#9ca3af',
+              cursor: 'pointer',
+              padding: '2px',
+              marginLeft: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            title="Tutup"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -529,7 +529,7 @@ export default function DashboardStockManager({ onLogout, onViewCatalog }) {
             }}
           >
             <CheckCircle2 size={18} style={{ color: '#16a34a' }} />
-            <span>{successToast}</span>
+            <span>{typeof successToast === 'string' ? successToast.replace(/^[✓✔]\s*/, '') : successToast}</span>
           </div>
         )}
 

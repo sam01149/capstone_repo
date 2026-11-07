@@ -667,8 +667,8 @@ export function ModalVerifikasi({ order, onClose, onToast, onConfirmed }) {
     const res = verifyAndConfirmPayment(order.id, true);
     onToast(
       res.isRopTriggered
-        ? `Pembayaran pesanan ${order.id} berhasil dikonfirmasi. ${res.ropAlert}`
-        : `Pembayaran pesanan ${order.id} berhasil diverifikasi & dikonfirmasi lunas. Stok otomatis dipotong.`
+        ? `Pembayaran pesanan ${order.id} lunas! Stok otomatis dipotong (-${order.quantity} ${order.unit || 'unit'}). Sisa stok menyentuh batas ROP dan dialihkan ke Stock Manager untuk pengadaan/restock.`
+        : `Pembayaran pesanan ${order.id} berhasil dikonfirmasi lunas. Stok otomatis dipotong (-${order.quantity} ${order.unit || 'unit'}). Alur Sales Admin tuntas, pengawasan inventaris selanjutnya ditangani Stock Manager.`
     );
     onConfirmed?.(res);
     onClose();
@@ -1043,7 +1043,7 @@ export function ModalDetailPesanan({ order, onClose }) {
                     Pembayaran Lunas & Transaksi Selesai
                   </div>
                   <div style={{ fontSize: '0.76rem', color: '#166534', marginTop: '2px' }}>
-                    Nominal transfer sesuai total tagihan, stok toko telah terpotong otomatis dari persediaan.
+                    Nominal transfer sesuai total tagihan, stok toko telah otomatis dipotong (-{order.quantity} {order.unit || 'unit'}) dan dicatat di mutasi keluar (OUT). Alur tugas Sales Admin telah tuntas; pengawasan stok dan ROP selanjutnya berada di wewenang Stock Manager.
                   </div>
                 </div>
               </div>

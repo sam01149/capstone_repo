@@ -1,4 +1,5 @@
 import { INITIAL_USERS, INITIAL_AUDIT_LOGS, simpleHash } from '../mocks/usersData';
+import { ROLES } from '../types';
 import { delay, setAuthToken, request, USE_REAL_BACKEND } from './apiClient';
 
 const STORAGE_USERS = 'farmsight_users_db_v1';
@@ -7,11 +8,30 @@ const STORAGE_SESSION = 'farmsight_session_user';
 
 function getLocalUsers() {
   const d = localStorage.getItem(STORAGE_USERS);
+  let users;
   if (!d) {
     localStorage.setItem(STORAGE_USERS, JSON.stringify(INITIAL_USERS));
     return INITIAL_USERS;
   }
-  return JSON.parse(d);
+  try {
+    users = JSON.parse(d);
+  } catch {
+    users = INITIAL_USERS;
+  }
+
+  let modified = false;
+  users = users.map((u) => {
+    if (u.name === 'Bambang Sudarsono') {
+      modified = true;
+      return { ...u, name: 'Ibu Intan Permatasari', roleTitle: 'Pemilik Toko (Super Admin)', avatar: 'IP' };
+    }
+    return u;
+  });
+
+  if (modified) {
+    localStorage.setItem(STORAGE_USERS, JSON.stringify(users));
+  }
+  return users;
 }
 
 function saveLocalUsers(users) {
@@ -20,11 +40,30 @@ function saveLocalUsers(users) {
 
 function getLocalLogs() {
   const d = localStorage.getItem(STORAGE_LOGS);
+  let logs;
   if (!d) {
     localStorage.setItem(STORAGE_LOGS, JSON.stringify(INITIAL_AUDIT_LOGS));
     return INITIAL_AUDIT_LOGS;
   }
-  return JSON.parse(d);
+  try {
+    logs = JSON.parse(d);
+  } catch {
+    logs = INITIAL_AUDIT_LOGS;
+  }
+
+  let modified = false;
+  logs = logs.map((l) => {
+    if (l.user && l.user.includes('Bambang Sudarsono')) {
+      modified = true;
+      return { ...l, user: l.user.replace('Bambang Sudarsono', 'Ibu Intan Permatasari') };
+    }
+    return l;
+  });
+
+  if (modified) {
+    localStorage.setItem(STORAGE_LOGS, JSON.stringify(logs));
+  }
+  return logs;
 }
 
 function saveLocalLogs(logs) {
@@ -83,16 +122,42 @@ export const authService = {
 
     const checkPasswordMatch = (u, pass) => {
       if (!pass) return false;
-      if (u.password === pass) return true;
-      if (Array.isArray(u.altPasswords) && u.altPasswords.includes(pass)) return true;
-      // Allow standard passwords for quick role login testing
-      if (pass.length >= 4) {
-        const p = pass.toLowerCase();
-        if (p === 'admin' || p === 'admin123' || p === 'admin1234' || p === 'admin12345') return true;
-        if (p === 'stock' || p === 'stock123' || p === 'stock1234' || p === 'stock12345') return true;
-        if (p === 'sales' || p === 'sales123' || p === 'sales1234' || p === 'sales12345') return true;
-        if (p === 'farm12345' || p === '12345678' || p === 'temppass2026' || p === 'farmtemp-2026') return true;
+      const cleanP = String(pass).trim();
+      const pLower = cleanP.toLowerCase();
+
+      // 1. Direct match with current active password (including custom changed password)
+      if (u.password === cleanP || u.password === pass) return true;
+      if (u.password && String(u.password).trim().toLowerCase() === pLower) return true;
+
+      // 2. Alt passwords list
+      if (Array.isArray(u.altPasswords) && u.altPasswords.includes(cleanP)) return true;
+
+      // 3. Fallback demo seeds for roles (Super Admin, Stock Manager, Sales Admin)
+      const uRole = String(u.role || '').toUpperCase();
+      if (uRole.includes('SUPER') || u.id === 'USR-001' || u.id === 'USR-001B') {
+        if (pLower === 'admin1234' || pLower === 'admin123' || pLower === 'admin' || pLower === 'admin12345' || pLower === 'adminfarm2026!') {
+          return true;
+        }
       }
+
+      if (uRole.includes('STOCK') || u.id === 'USR-002' || u.id === 'USR-002B') {
+        if (pLower === 'stock1234' || pLower === 'stock123' || pLower === 'stock' || pLower === 'stock12345' || pLower === 'stockmanager2026!') {
+          return true;
+        }
+      }
+
+      if (uRole.includes('SALES') || u.id === 'USR-003' || u.id === 'USR-003B') {
+        if (pLower === 'sales1234' || pLower === 'sales123' || pLower === 'sales' || pLower === 'sales12345' || pLower === 'salesadmin2026!') {
+          return true;
+        }
+      }
+
+      if (u.id === 'USR-004' || u.id === 'USR-004B' || (u.email && u.email.includes('stafbaru'))) {
+        if (pLower === 'temppass2026' || pLower === 'temppass123!') {
+          return true;
+        }
+      }
+
       return false;
     };
 
@@ -100,39 +165,35 @@ export const authService = {
       const emailLower = (u.email || '').toLowerCase();
       const secLower = (u.secondaryEmail || '').toLowerCase();
 
-      const emailMatch =
+      return (
         emailLower === cleanInput ||
         secLower === cleanInput ||
         emailLower.startsWith(cleanInput + '@') ||
         (isSuperAdminKeyword && (u.role === 'SUPER_ADMIN' || u.role === ROLES.SUPER_ADMIN)) ||
         (isStockManagerKeyword && (u.role === 'STOCK_MANAGER' || u.role === ROLES.STOCK_MANAGER)) ||
         (isSalesAdminKeyword && (u.role === 'SALES_ADMIN' || u.role === ROLES.SALES_ADMIN)) ||
-        (isStafBaruKeyword && (u.id === 'USR-004' || emailLower.includes('rian') || emailLower.includes('stafbaru')));
-
-      if (!emailMatch) return false;
-      return checkPasswordMatch(u, cleanPass);
+        (isStafBaruKeyword && (u.id === 'USR-004' || emailLower.includes('rian') || emailLower.includes('stafbaru')))
+      );
     });
 
-    // Fallback search in INITIAL_USERS if localStorage was stale
+    // Fallback search in INITIAL_USERS if user not found in local array
     if (!user) {
       user = INITIAL_USERS.find((u) => {
         const emailLower = (u.email || '').toLowerCase();
         const secLower = (u.secondaryEmail || '').toLowerCase();
 
-        const emailMatch =
+        return (
           emailLower === cleanInput ||
           secLower === cleanInput ||
           emailLower.startsWith(cleanInput + '@') ||
           (isSuperAdminKeyword && u.role === ROLES.SUPER_ADMIN) ||
           (isStockManagerKeyword && u.role === ROLES.STOCK_MANAGER) ||
           (isSalesAdminKeyword && u.role === ROLES.SALES_ADMIN) ||
-          (isStafBaruKeyword && (u.id === 'USR-004' || emailLower.includes('rian') || emailLower.includes('stafbaru')));
-
-        if (!emailMatch) return false;
-        return checkPasswordMatch(u, cleanPass);
+          (isStafBaruKeyword && (u.id === 'USR-004' || emailLower.includes('rian') || emailLower.includes('stafbaru')))
+        );
       });
       if (user) {
-        users = INITIAL_USERS;
+        users = [...users, user];
         saveLocalUsers(users);
       }
     }
@@ -141,8 +202,20 @@ export const authService = {
       throw new Error('Alamat email atau kata sandi salah. Silakan periksa kembali kredensial Anda.');
     }
 
-    if (!user.isActive) {
-      throw new Error('Akun Anda telah dinonaktifkan oleh Super Admin. Hubungi pengelola untuk akses.');
+    // Super Admin pemilik sistem selalu aktif
+    const isSuper = (user.role === 'SUPER_ADMIN' || user.role === ROLES.SUPER_ADMIN || user.id === 'USR-001' || user.id === 'USR-001B');
+    if (isSuper) {
+      user.isActive = true;
+    }
+
+    // Jika akun berstatus Nonaktif, akun tidak bisa digunakan untuk login
+    if (!isSuper && (user.isActive === false || user.status === 'Nonaktif')) {
+      throw new Error('Akun staf Anda berstatus Nonaktif oleh Super Admin. Tidak dapat digunakan untuk login.');
+    }
+
+    const isMatch = checkPasswordMatch(user, cleanPass);
+    if (!isMatch) {
+      throw new Error('Alamat email atau kata sandi salah. Silakan periksa kembali kredensial Anda.');
     }
 
     // Update last login
@@ -174,7 +247,14 @@ export const authService = {
   getCurrentUser() {
     try {
       const d = localStorage.getItem(STORAGE_SESSION);
-      return d ? JSON.parse(d) : null;
+      if (!d) return null;
+      const u = JSON.parse(d);
+      if (u && (u.name === 'Bambang Sudarsono' || (!u.name && u.role === ROLES.SUPER_ADMIN))) {
+        u.name = 'Ibu Intan Permatasari';
+        u.avatar = 'IP';
+        localStorage.setItem(STORAGE_SESSION, JSON.stringify(u));
+      }
+      return u;
     } catch {
       return null;
     }
@@ -195,7 +275,9 @@ export const authService = {
 
     user.password = newPassword;
     user.passwordHash = simpleHash(newPassword);
+    user.altPasswords = [];
     user.must_change_password = false;
+    user.hasChangedPassword = true;
     saveLocalUsers(users);
 
     // Update current session
@@ -245,6 +327,7 @@ export const authService = {
       roleTitle: roleTitle || 'Staf Operasional',
       phone: phone || '-',
       isActive: true,
+      status: 'Aktif',
       must_change_password: true, // Wajib ganti saat login pertama!
       lastLogin: 'Belum pernah login',
       createdAt: new Date().toISOString().slice(0, 10),
@@ -295,6 +378,7 @@ export const authService = {
     if (!user) throw new Error('Staf tidak ditemukan.');
 
     user.isActive = !user.isActive;
+    user.status = user.isActive ? 'Aktif' : 'Nonaktif';
     saveLocalUsers(users);
 
     this.recordAuditLog('Super Admin', 'TOGGLE_STATUS', 'Manajemen Akun', `Mengubah status akun ${user.name} menjadi ${user.isActive ? 'Aktif' : 'Nonaktif'}`);

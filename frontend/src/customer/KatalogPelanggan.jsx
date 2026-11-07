@@ -775,7 +775,7 @@ export default function KatalogPelanggan({ onBackToHome, onOpenLogin, onGoToDash
                       lineHeight: 1.5,
                     }}
                   >
-                    {selectedProduct.composition}
+                    {selectedProduct.composition || 'Bahan alami berkualitas pilihan dari kelompok tani UMKM Toko Farm Berkah.'}
                   </div>
                 </div>
               </div>
@@ -1099,7 +1099,7 @@ export default function KatalogPelanggan({ onBackToHome, onOpenLogin, onGoToDash
                       className="animate-fade-in"
                     >
                       <CheckCircle2 size={15} />
-                      <span>{invoiceToast}</span>
+                      <span>{typeof invoiceToast === 'string' ? invoiceToast.replace(/^[✓✔]\s*/, '') : invoiceToast}</span>
                     </div>
                   )}
 

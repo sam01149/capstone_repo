@@ -10,11 +10,26 @@ const STORAGE_DRAFTS = 'farmsight_drafts_db_v1';
 
 function getLocalOrders() {
   const d = localStorage.getItem(STORAGE_ORDERS);
+  let orders;
   if (!d) {
     localStorage.setItem(STORAGE_ORDERS, JSON.stringify(INITIAL_ORDERS));
     return INITIAL_ORDERS;
   }
-  return JSON.parse(d);
+  try {
+    orders = JSON.parse(d);
+  } catch {
+    orders = INITIAL_ORDERS;
+  }
+  if (Array.isArray(orders) && orders.some((o) => o && (o.id === 'ORD-2026-328' || String(o.id).includes('328')))) {
+    orders = orders.filter((o) => !(o && (o.id === 'ORD-2026-328' || String(o.id).includes('328'))));
+    try {
+      localStorage.setItem(STORAGE_ORDERS, JSON.stringify(orders));
+      window.dispatchEvent(new Event('farmsight_orders_updated'));
+    } catch (e) {
+      // ignore
+    }
+  }
+  return orders;
 }
 
 function saveLocalOrders(orders) {

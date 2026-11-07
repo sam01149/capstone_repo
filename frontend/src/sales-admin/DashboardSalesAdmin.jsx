@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -52,7 +52,23 @@ export default function DashboardSalesAdmin({ onLogout, onViewCatalog }) {
   const { showToast, ToastComponent } = useToast();
 
   // State navigasi tab: 'dashboard' (Ringkasan Kinerja) atau 'orders' (Manajemen Pesanan)
-  const [activeMenu, setActiveMenu] = useState('dashboard');
+  // Dilengkapi persistensi sessionStorage agar saat halaman di-refresh tetap di tab yang sedang aktif
+  const [activeMenu, setActiveMenu] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('sales_admin_active_tab');
+      return saved === 'orders' || saved === 'dashboard' ? saved : 'dashboard';
+    } catch {
+      return 'dashboard';
+    }
+  });
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('sales_admin_active_tab', activeMenu);
+    } catch {
+      // ignore
+    }
+  }, [activeMenu]);
 
   // Real-time synchronization data pesanan & inventaris
   const [orders, setOrders] = useState(() => getStoredOrders() || []);
@@ -465,7 +481,7 @@ export default function DashboardSalesAdmin({ onLogout, onViewCatalog }) {
                     {metrics.pendingPayment}
                   </div>
                   <div style={{ fontSize: '0.74rem', color: '#718277', marginTop: '2px' }}>
-                    QRIS sudah dikirim ke WhatsApp
+                    Menunggu transfer dari pelanggan
                   </div>
                 </div>
               </div>
@@ -597,95 +613,57 @@ export default function DashboardSalesAdmin({ onLogout, onViewCatalog }) {
               </div>
             )}
 
-            {/* Pesan Masuk WhatsApp dari Customer (Draft Invoices Queue) */}
+            {/* Pesan Masuk WhatsApp dari Customer (Banner Notifikasi Ringkas) */}
             {drafts.length > 0 && (
               <div
                 style={{
-                  backgroundColor: '#ffffff',
-                  borderRadius: '16px',
-                  border: '1px solid #e1e7e2',
-                  padding: '22px 24px',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                  backgroundColor: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderLeft: '5px solid #16a34a',
+                  borderRadius: '12px',
+                  padding: '16px 20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '16px',
+                  flexWrap: 'wrap',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ width: '34px', height: '34px', borderRadius: '8px', backgroundColor: '#dcfce7', color: '#15803d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <MessageSquare size={17} />
-                    </div>
-                    <div>
-                      <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#142019' }}>
-                        Pesan WhatsApp Masuk dari Pelanggan ({drafts.length} Rincian Pesanan)
-                      </h3>
-                      <p style={{ margin: 0, fontSize: '0.76rem', color: '#64748b' }}>
-                        Pelanggan mengirim rincian draft via WA. Klik "Input Pesanan" untuk mengecek stok toko.
-                      </p>
-                    </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#dcfce7', color: '#15803d', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <MessageSquare size={18} />
                   </div>
-                  <span style={{ fontSize: '0.74rem', fontWeight: 700, backgroundColor: '#dcfce7', color: '#15803d', padding: '3px 10px', borderRadius: '12px' }}>
-                    Perlu Diinput ke Sistem
-                  </span>
+                  <div>
+                    <strong style={{ fontSize: '0.92rem', color: '#166534' }}>
+                      {drafts.length} Pesan WhatsApp Masuk dari Pelanggan ({drafts.length} Rincian Pesanan)
+                    </strong>
+                    <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#475569' }}>
+                      Pelanggan mengirim rincian draft pesanan via WhatsApp. Klik tombol untuk mengecek stok toko dan memproses pesanan di Manajemen Pesanan.
+                    </p>
+                  </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '14px' }}>
-                  {drafts.map((d) => (
-                    <div
-                      key={d.invoiceNo}
-                      style={{
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '12px',
-                        padding: '14px',
-                        backgroundColor: '#f8faf9',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        gap: '12px',
-                      }}
-                    >
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', color: '#64748b', marginBottom: '4px' }}>
-                          <span style={{ fontFamily: 'monospace', fontWeight: 700 }}>{d.invoiceNo}</span>
-                          <span>{d.date}</span>
-                        </div>
-                        <div style={{ fontWeight: 800, fontSize: '0.98rem', color: '#142019' }}>
-                          {d.productName} ({formatQtyUnit(d.quantity, d.unit)})
-                        </div>
-                        <div style={{ fontSize: '0.82rem', color: '#334155', marginTop: '4px' }}>
-                          👤 <strong>{d.customerName}</strong> · 📱 {d.customerPhone}
-                        </div>
-                        <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#1b4332', marginTop: '6px' }}>
-                          Total: {formatRupiah(d.subtotal)}
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedDraft(d);
-                          setActiveModal('create');
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '9px 12px',
-                          borderRadius: '8px',
-                          border: 'none',
-                          backgroundColor: '#1b4332',
-                          color: '#ffffff',
-                          fontSize: '0.8rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                        }}
-                      >
-                        <Plus size={14} />
-                        <span>Input Pesanan Ini</span>
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveMenu('orders')}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    backgroundColor: '#16a34a',
+                    color: '#ffffff',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    boxShadow: '0 2px 6px rgba(22, 163, 74, 0.2)',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  Input Pesanan di Manajemen Pesanan →
+                </button>
               </div>
             )}
 

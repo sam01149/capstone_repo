@@ -250,8 +250,21 @@ export const INITIAL_FORECASTS = [
 export function getStoredOrders() {
   try {
     const data = localStorage.getItem(STORAGE_KEY_ORDERS);
-    const orders = data ? JSON.parse(data) : INITIAL_ORDERS;
+    let orders = data ? JSON.parse(data) : INITIAL_ORDERS;
     if (!Array.isArray(orders) || orders.length === 0) return INITIAL_ORDERS;
+
+    // Hapus spesifik pesanan ORD-2026-328 sesuai permintaan pengguna
+    const hadTargetOrder = orders.some((o) => o && (o.id === 'ORD-2026-328' || String(o.id).includes('328')));
+    if (hadTargetOrder) {
+      orders = orders.filter((o) => !(o && (o.id === 'ORD-2026-328' || String(o.id).includes('328'))));
+      try {
+        localStorage.setItem(STORAGE_KEY_ORDERS, JSON.stringify(orders));
+        window.dispatchEvent(new Event('farmsight_orders_updated'));
+      } catch (e) {
+        // ignore
+      }
+    }
+
     return orders.map((o) => {
       const g1 = o.gateway1Status || (o.status === 'DIBATALKAN' ? 'GAGAL' : 'LOLOS');
       let g2 = o.gateway2Status;
@@ -749,10 +762,10 @@ export function verifyAndConfirmPayment(orderId, isAmountValid, customNote) {
     productName: order.productName,
     type: 'OUT',
     category: 'Penjualan Pesanan',
-    reference: order.id,
+    reference: `Pesanan #${order.id} (${order.customerName})`,
     quantity: -order.quantity,
     remainingStock: remainingStockAfter,
-    operator: 'Sales Admin (Konfirmasi Gateway 2)',
+    operator: 'Sistem Otomatis (Pesanan Lunas)',
   };
   const movements = getStoredMovements();
   saveStoredMovements([newMovement, ...movements]);

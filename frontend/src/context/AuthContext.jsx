@@ -14,7 +14,9 @@ export function AuthProvider({ children }) {
       const stored = localStorage.getItem('farmsight_users_db_v1');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((u) => (u.name === 'Bambang Sudarsono' ? { ...u, name: 'Ibu Intan Permatasari', roleTitle: 'Pemilik Toko (Super Admin)', avatar: 'IP' } : u));
+        }
       }
     } catch {
       // fallback
@@ -71,15 +73,11 @@ export function AuthProvider({ children }) {
   }, [resetIdleTimer]);
 
   const login = async (email, password) => {
-    setLoading(true);
-    try {
-      const loggedUser = await authService.login(email, password);
-      setUser(loggedUser);
-      setIdleNotice(false);
-      return loggedUser;
-    } finally {
-      setLoading(false);
-    }
+    // Hindari mengaktifkan global loading yang meng-unmount Login view
+    const loggedUser = await authService.login(email, password);
+    setUser(loggedUser);
+    setIdleNotice(false);
+    return loggedUser;
   };
 
   const logout = async () => {
