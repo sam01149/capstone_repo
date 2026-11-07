@@ -36,7 +36,6 @@ import {
   generateCustomerQrisWhatsAppUrl,
   markQrisSent,
 } from '../data/ordersAndInventoryData';
-import { EmptyState, useToast, useStoreSync } from '../shared/StaffUI';
 import {
   ORDER_STATUS,
   FormInputPesanan,
@@ -45,6 +44,9 @@ import {
   ModalVerifikasi,
   ModalDetailPesanan,
   copyQrisImage,
+  EmptyState,
+  useToast,
+  useStoreSync,
 } from './PesananCustomer';
 
 export default function DashboardSalesAdmin({ onLogout, onViewCatalog }) {
@@ -205,7 +207,7 @@ export default function DashboardSalesAdmin({ onLogout, onViewCatalog }) {
             </div>
             <div style={{ fontSize: '0.72rem', color: '#718277', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <MapPin size={11} color="#2d6a4f" />
-              <span>Komplek Masnaga, Pulo Gebang · Portal Penjualan</span>
+              <span>Komplek Masnaga, Pulo Gebang</span>
             </div>
           </div>
         </div>

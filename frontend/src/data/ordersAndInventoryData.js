@@ -120,18 +120,6 @@ export const INITIAL_ORDERS = [];
 // Initial Mock Stock Movements
 export const INITIAL_MOVEMENTS = [
   {
-    id: 'MOV-091',
-    date: '2026-11-04 11:32',
-    productId: 'GORENGAN',
-    productName: 'GORENGAN',
-    type: 'OUT',
-    category: 'Penjualan Pesanan',
-    reference: 'ORD-2026-079',
-    quantity: -20,
-    remainingStock: 60,
-    operator: 'Staff Gudang (BS)',
-  },
-  {
     id: 'MOV-090',
     date: '2026-11-04 09:15',
     productId: 'KERIPIK-LABU',
@@ -142,18 +130,6 @@ export const INITIAL_MOVEMENTS = [
     quantity: +30,
     remainingStock: 45,
     operator: 'Staff Persediaan (BS)',
-  },
-  {
-    id: 'MOV-089',
-    date: '2026-11-03 16:40',
-    productId: 'BAYAM',
-    productName: 'BAYAM',
-    type: 'OUT',
-    category: 'Penjualan Toko Offline',
-    reference: 'KASIR-004',
-    quantity: -12,
-    remainingStock: 18,
-    operator: 'Sales Admin (SR)',
   },
 ];
 
@@ -325,7 +301,22 @@ export function getStoredMovements() {
       localStorage.setItem(STORAGE_KEY_MOVEMENTS, JSON.stringify(INITIAL_MOVEMENTS));
       return INITIAL_MOVEMENTS;
     }
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    if (!Array.isArray(parsed)) return INITIAL_MOVEMENTS;
+    // Hapus data mutasi lama: MOV-972, MOV-213, MOV-091, MOV-089
+    const excludedIds = new Set(['MOV-972', 'MOV-213', 'MOV-091', 'MOV-089']);
+    const filtered = parsed.filter(
+      (m) =>
+        !excludedIds.has(m.id) &&
+        !String(m.reference || '').includes('ORD-2026-659') &&
+        !String(m.reference || '').includes('ORD-2026-527') &&
+        !String(m.reference || '').includes('ORD-2026-079') &&
+        !String(m.reference || '').includes('KASIR-004')
+    );
+    if (filtered.length !== parsed.length) {
+      localStorage.setItem(STORAGE_KEY_MOVEMENTS, JSON.stringify(filtered));
+    }
+    return filtered;
   } catch {
     return INITIAL_MOVEMENTS;
   }

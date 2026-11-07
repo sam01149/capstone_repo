@@ -618,6 +618,9 @@ export default function ManajemenProduk({
                             <span style={{ fontSize: '0.88rem', fontWeight: 800, color: p.stock <= (p.reorderPoint || p.minStock || 10) ? '#dc2626' : '#0f172a' }}>
                               {p.stock}
                             </span>
+                            {/gr|gram/i.test(p.unit) && (
+                              <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 600 }}>/</span>
+                            )}
                             <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>
                               {p.unit}
                             </span>

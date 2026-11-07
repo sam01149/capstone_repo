@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { NotificationProvider } from './context/NotificationContext';
-import { ToastProvider, useToast } from './shared/Toast';
+import { ToastProvider, useToast } from './sales-admin/PesananCustomer';
 import { ROLES } from './types';
 
 // 1. Landing Page (Halaman Utama dengan 2 Pintu: Guest vs Staf)
@@ -60,6 +60,13 @@ function MainRouter() {
   };
 
   const handleStaffLogout = () => {
+    try {
+      sessionStorage.removeItem('sales_admin_active_tab');
+      sessionStorage.removeItem('super_admin_active_tab');
+      sessionStorage.removeItem('stock_manager_active_tab');
+    } catch {
+      // ignore
+    }
     logout();
     navigateTo('landing');
   };

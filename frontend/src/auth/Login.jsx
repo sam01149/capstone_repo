@@ -47,6 +47,13 @@ export default function Login({ onBackToCatalog, onBackToHome, onLoginSuccess, o
       const loggedInUser = await login(email, password);
       setLoading(false);
 
+      try {
+        sessionStorage.removeItem('sales_admin_active_tab');
+        sessionStorage.removeItem('super_admin_active_tab');
+        sessionStorage.removeItem('stock_manager_active_tab');
+      } catch {
+        // ignore
+      }
       localStorage.setItem('farmsight_view', 'dashboard');
       window.location.hash = '#/dashboard';
 

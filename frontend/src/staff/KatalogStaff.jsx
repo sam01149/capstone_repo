@@ -32,6 +32,7 @@ import {
   getStoredProducts,
   calculateCategories,
   formatRupiah,
+  formatStockUnit,
 } from '../data/productsData';
 
 export default function KatalogStaff({ onBackToHome, onGoToDashboard, onLogout }) {
@@ -610,8 +611,7 @@ export default function KatalogStaff({ onBackToHome, onGoToDashboard, onLogout }
                       marginTop: '4px',
                     }}
                   >
-                    {selectedProduct.stock || 0}{' '}
-                    <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{selectedProduct.unit}</span>
+                    {formatStockUnit(selectedProduct.stock, selectedProduct.unit)}
                   </div>
                 </div>
 
@@ -628,8 +628,7 @@ export default function KatalogStaff({ onBackToHome, onGoToDashboard, onLogout }
                     Batas Minimum
                   </div>
                   <div style={{ fontSize: '1rem', fontWeight: 700, color: '#334155', marginTop: '2px' }}>
-                    {selectedProduct.minStock || 0}{' '}
-                    <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748b' }}>{selectedProduct.unit}</span>
+                    {formatStockUnit(selectedProduct.minStock, selectedProduct.unit)}
                   </div>
                 </div>
 
@@ -1075,7 +1074,7 @@ export default function KatalogStaff({ onBackToHome, onGoToDashboard, onLogout }
                         {product.priceFormatted || formatRupiah(product.price)}
                       </div>
                       <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600 }}>
-                        Stok: <strong style={{ color: isOut ? '#dc2626' : isLow ? '#b45309' : '#166534' }}>{product.stock} {product.unit}</strong>
+                        Stok: <strong style={{ color: isOut ? '#dc2626' : isLow ? '#b45309' : '#166534' }}>{formatStockUnit(product.stock, product.unit)}</strong>
                       </div>
                     </div>
 

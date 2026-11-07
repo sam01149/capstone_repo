@@ -73,6 +73,14 @@ export function AuthProvider({ children }) {
   }, [resetIdleTimer]);
 
   const login = async (email, password) => {
+    // Bersihkan sesi tab aktif agar saat baru login selalu menampilkan Dashboard Utama terlebih dahulu
+    try {
+      sessionStorage.removeItem('sales_admin_active_tab');
+      sessionStorage.removeItem('super_admin_active_tab');
+      sessionStorage.removeItem('stock_manager_active_tab');
+    } catch {
+      // ignore
+    }
     // Hindari mengaktifkan global loading yang meng-unmount Login view
     const loggedUser = await authService.login(email, password);
     setUser(loggedUser);
@@ -81,6 +89,13 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
+    try {
+      sessionStorage.removeItem('sales_admin_active_tab');
+      sessionStorage.removeItem('super_admin_active_tab');
+      sessionStorage.removeItem('stock_manager_active_tab');
+    } catch {
+      // ignore
+    }
     await authService.logout();
     setUser(null);
   };

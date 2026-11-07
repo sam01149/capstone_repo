@@ -213,7 +213,7 @@ export default function DashboardSuperAdmin({ onLogout, onViewCatalog }) {
             </div>
             <div style={{ fontSize: '0.72rem', color: '#718277', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <MapPin size={11} color="#2d6a4f" />
-              <span>Komplek Masnaga, Pulo Gebang · Portal Pemilik Toko</span>
+              <span>Komplek Masnaga, Pulo Gebang</span>
             </div>
           </div>
         </div>

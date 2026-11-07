@@ -3,13 +3,13 @@
 // 2. Kirim QR Code pembayaran ke WhatsApp customer
 // 3. Catat bukti transfer yang dikirim customer via WhatsApp
 // 4. Verifikasi nominal -> Konfirmasi Pembayaran (Confirm Order) / Minta Transfer Ulang
-import React, { useMemo, useState } from 'react';
+// 5. Komponen Dialog Pop-up (Modal, FlowSteps, EmptyState), Notifikasi Toast & Styling Terpadu
+import React, { useMemo, useState, createContext, useContext, useEffect } from 'react';
 import {
   PackageCheck, PackageX, QrCode, MessageSquare, Copy, Download, Upload,
   CheckCircle2, AlertTriangle, Receipt, Phone, MapPin, User, ShoppingBag, XCircle,
-  Plus, Minus, Check, Eye, Clock, ShieldCheck, CheckCheck, X,
+  Plus, Minus, Check, Eye, Clock, ShieldCheck, CheckCheck, X, Store, LogOut, Info, ChevronRight,
 } from 'lucide-react';
-import { Modal, FlowSteps } from '../shared/StaffUI';
 import { formatRupiah, getStoredProducts, cleanUnit, formatQtyUnit } from '../data/productsData';
 import {
   createSalesOrder,
@@ -22,6 +22,1033 @@ import {
   submitTransferProof,
   verifyAndConfirmPayment,
 } from '../data/ordersAndInventoryData';
+
+// ============================================================================
+// STYLING CSS TERPADU SALES ADMIN & PORTAL STAF
+// ============================================================================
+const STAFF_STYLES = `
+/* Kerangka & Layout Staf */
+.staff-shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--surface-bg, #f8faf9);
+}
+.staff-sidebar {
+  width: 250px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-right: 1px solid var(--surface-border, #e2e8e3);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+.staff-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 18px 14px;
+  border-bottom: 1px solid #eef2ef;
+}
+.staff-brand img {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--surface-border, #e2e8e3);
+}
+.staff-brand-title {
+  font-weight: 800;
+  font-size: 0.98rem;
+  color: var(--primary-800, #1b4332);
+  line-height: 1.2;
+}
+.staff-brand-sub {
+  font-size: 0.72rem;
+  color: var(--text-muted, #64748b);
+}
+.staff-role-pill {
+  margin: 14px 18px 6px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.staff-nav {
+  flex: 1;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+}
+.staff-nav-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 12px 8px 4px;
+}
+.staff-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #334155);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+}
+.staff-nav-item:hover {
+  background: #f0fdf4;
+  color: #1b4332;
+}
+.staff-nav-item.active {
+  background: #2d6a4f;
+  color: #ffffff;
+}
+.staff-nav-badge {
+  margin-left: auto;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.staff-nav-item.active .staff-nav-badge {
+  background: #ffffff;
+  color: #1b4332;
+}
+.staff-sidebar-footer {
+  padding: 14px;
+  border-top: 1px solid #eef2ef;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.staff-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.staff-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #1b4332;
+  font-weight: 800;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.staff-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.staff-topbar {
+  background: #ffffff;
+  border-bottom: 1px solid var(--surface-border, #e2e8e3);
+  padding: 16px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.staff-page-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--text-main, #142019);
+}
+.staff-page-sub {
+  font-size: 0.82rem;
+  color: var(--text-muted, #64748b);
+}
+.staff-content {
+  padding: 24px 28px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: fadeIn 0.25s ease forwards;
+}
+
+/* Kartu & Grid */
+.card {
+  background: #ffffff;
+  border: 1px solid var(--surface-border, #e2e8e3);
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+.card-pad { padding: 20px; }
+.card-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #eef2ef;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.card-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #142019;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-sub {
+  font-size: 0.78rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+.grid-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+.stat-card {
+  padding: 18px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.stat-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.stat-label {
+  font-size: 0.78rem;
+  color: #64748b;
+  font-weight: 600;
+}
+.stat-value {
+  font-size: 1.55rem;
+  font-weight: 800;
+  color: #142019;
+  line-height: 1.2;
+}
+.stat-hint {
+  font-size: 0.72rem;
+  color: #64748b;
+}
+
+/* Tombol (btn) */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.btn-sm {
+  padding: 7px 11px;
+  font-size: 0.78rem;
+  border-radius: 8px;
+}
+.btn-primary {
+  background: #2d6a4f;
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) {
+  background: #1b4332;
+}
+.btn-wa {
+  background: #25d366;
+  color: #fff;
+}
+.btn-wa:hover:not(:disabled) {
+  background: #1ebc59;
+}
+.btn-outline {
+  background: #fff;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+.btn-outline:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #52b788;
+  color: #1b4332;
+}
+.btn-danger {
+  background: #fff;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+.btn-danger:hover:not(:disabled) {
+  background: #fef2f2;
+}
+.btn-amber {
+  background: #f59e0b;
+  color: #fff;
+}
+.btn-amber:hover:not(:disabled) {
+  background: #d97706;
+}
+
+/* Badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.badge-green { background: #dcfce7; color: #15803d; }
+.badge-yellow { background: #fef9c3; color: #854d0e; }
+.badge-blue { background: #e0f2fe; color: #0369a1; }
+.badge-red { background: #fee2e2; color: #b91c1c; }
+.badge-gray { background: #f1f5f9; color: #475569; }
+.badge-purple { background: #f3e8ff; color: #7e22ce; }
+
+/* Formulir */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #334155;
+}
+.input,
+.select,
+.textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  background: #fff;
+  color: #142019;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: #40916c;
+  box-shadow: 0 0 0 3px rgba(45, 106, 79, 0.12);
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+/* Filter & Chips */
+.filter-bar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.search-box {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+}
+.search-box svg {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #64748b;
+}
+.search-box .input {
+  padding-left: 34px;
+}
+.chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.chip {
+  padding: 7px 13px;
+  border-radius: 999px;
+  border: 1px solid #d5ddd7;
+  background: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.chip.active {
+  background: #2d6a4f;
+  border-color: #2d6a4f;
+  color: #fff;
+}
+.chip-count {
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  padding: 0 7px;
+  font-size: 0.72rem;
+}
+.chip.active .chip-count {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Tabel */
+.table-wrap { overflow-x: auto; }
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+.table th {
+  text-align: left;
+  padding: 11px 14px;
+  background: #f8faf8;
+  color: #64748b;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid #e2e8e3;
+  white-space: nowrap;
+}
+.table td {
+  padding: 13px 14px;
+  border-bottom: 1px solid #f1f5f2;
+  vertical-align: middle;
+}
+.table tr:hover td {
+  background: #fbfcfb;
+}
+
+/* Empty State */
+.empty-state {
+  padding: 44px 20px;
+  text-align: center;
+  color: #64748b;
+  font-size: 0.88rem;
+}
+.empty-state svg {
+  color: #c3d2c7;
+  margin-bottom: 10px;
+}
+
+/* Modal Dialog */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(3px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal {
+  background: #fff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  animation: slideDown 0.2s ease forwards;
+}
+.modal-lg { max-width: 840px; }
+.modal-xl { max-width: 1060px; width: 95vw; }
+.modal-fullscreen { max-width: 1260px; width: 96vw; max-height: 94vh; }
+.modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #eef2ef;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.modal-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.modal-footer {
+  padding: 14px 20px;
+  border-top: 1px solid #eef2ef;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: none;
+  background: #f1f5f9;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* Callout Kotak Informasi */
+.callout {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  align-items: flex-start;
+}
+.callout svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.callout-green { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+.callout-yellow { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+.callout-red { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+.callout-blue { background: #f0f9ff; border: 1px solid #bae6fd; color: #075985; }
+
+/* Toast Notifikasi (Default Global) */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 2000;
+  max-width: 430px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: #1b4332;
+  color: #fff;
+  font-size: 0.86rem;
+  font-weight: 600;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25);
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  text-align: justify;
+  line-height: 1.45;
+  animation: slideDown 0.2s ease forwards;
+}
+.toast span {
+  text-align: justify;
+  line-height: 1.45;
+  display: block;
+}
+.toast svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.toast.toast-error {
+  background: #b91c1c;
+}
+
+/* Langkah Alur (FlowSteps) */
+.flow-steps {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.flow-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+.flow-step.done {
+  background: #dcfce7;
+  color: #15803d;
+}
+.flow-step.current {
+  background: #2d6a4f;
+  color: #fff;
+}
+.flow-arrow {
+  color: #cbd5e1;
+}
+
+/* Helpers */
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.text-muted { color: #64748b; }
+.text-sm { font-size: 0.78rem; }
+.fw-800 { font-weight: 800; }
+.two-col {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 20px;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+`;
+
+// Injeksi stylesheet otomatis ke <head> satu kali
+if (typeof document !== 'undefined' && !document.getElementById('sales-admin-ui-styles')) {
+  const styleEl = document.createElement('style');
+  styleEl.id = 'sales-admin-ui-styles';
+  styleEl.textContent = STAFF_STYLES;
+  document.head.appendChild(styleEl);
+}
+
+// ============================================================================
+// KOMPONEN DIALOG & PENDUKUNG UI (MODAL, FLOWSTEPS, EMPTYSTATE, STATCARD)
+// ============================================================================
+
+export function Modal({ title, subtitle, onClose, children, footer, size }) {
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose?.();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const sizeClass =
+    size === 'fullscreen'
+      ? 'modal-fullscreen'
+      : size === 'xl'
+      ? 'modal-xl'
+      : size === 'lg'
+      ? 'modal-lg'
+      : '';
+
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
+      <div className={`modal ${sizeClass}`}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">{title}</div>
+            {subtitle && <div className="text-sm text-muted">{subtitle}</div>}
+          </div>
+          <button type="button" className="icon-btn" onClick={onClose} aria-label="Tutup">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="modal-body">{children}</div>
+        {footer && <div className="modal-footer">{footer}</div>}
+      </div>
+    </div>
+  );
+}
+
+export function FlowSteps({ steps, current }) {
+  return (
+    <div className="flow-steps">
+      {steps.map((s, i) => (
+        <React.Fragment key={s}>
+          <span className={`flow-step ${i < current ? 'done' : i === current ? 'current' : ''}`}>
+            {i < current ? '✓' : i + 1}. {s}
+          </span>
+          {i < steps.length - 1 && <ChevronRight size={14} className="flow-arrow" />}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+export function EmptyState({ icon, title, desc }) {
+  return (
+    <div className="empty-state">
+      {icon}
+      <div style={{ fontWeight: 700, color: '#334155' }}>{title}</div>
+      {desc && <div style={{ marginTop: 4 }}>{desc}</div>}
+    </div>
+  );
+}
+
+export function StatCard({ icon, label, value, hint, color = '#2d6a4f', bg = '#dcfce7', onClick }) {
+  return (
+    <div className="card stat-card" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
+      <div className="stat-icon" style={{ background: bg, color }}>
+        {icon}
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div className="stat-label">{label}</div>
+        <div className="stat-value">{value}</div>
+        {hint && <div className="stat-hint">{hint}</div>}
+      </div>
+    </div>
+  );
+}
+
+export function StaffLayout({
+  user,
+  roleLabel,
+  roleColor,
+  roleBg,
+  menus,
+  activeMenu,
+  onSelectMenu,
+  title,
+  subtitle,
+  actions,
+  onLogout,
+  onViewCatalog,
+  children,
+}) {
+  return (
+    <div className="staff-shell">
+      <aside className="staff-sidebar">
+        <div className="staff-brand">
+          <img src="/images/logo-farm-berkah.jpg" alt="Logo Toko Farm Berkah" />
+          <div>
+            <div className="staff-brand-title">Toko Farm Berkah</div>
+            <div className="staff-brand-sub">FarmSight · Portal Staf</div>
+          </div>
+        </div>
+
+        <div className="staff-role-pill" style={{ background: roleBg, color: roleColor }}>
+          {roleLabel}
+        </div>
+
+        <nav className="staff-nav">
+          {menus.map((m) =>
+            m.section ? (
+              <div key={m.section} className="staff-nav-label">
+                {m.section}
+              </div>
+            ) : (
+              <button
+                key={m.id}
+                type="button"
+                className={`staff-nav-item ${activeMenu === m.id ? 'active' : ''}`}
+                onClick={() => onSelectMenu(m.id)}
+              >
+                {m.icon}
+                <span>{m.label}</span>
+                {m.badge > 0 && <span className="staff-nav-badge">{m.badge}</span>}
+              </button>
+            )
+          )}
+        </nav>
+
+        <div className="staff-sidebar-footer">
+          <div className="staff-user">
+            <div className="staff-avatar">
+              {user?.avatar || (user?.name || 'S').slice(0, 2).toUpperCase()}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontSize: '0.84rem',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {user?.name || 'Staf'}
+              </div>
+              <div
+                className="text-sm text-muted"
+                style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+              >
+                {user?.email}
+              </div>
+            </div>
+          </div>
+          <button type="button" className="btn btn-outline btn-sm" onClick={onViewCatalog}>
+            <Store size={14} /> Lihat Katalog Publik
+          </button>
+          <button type="button" className="btn btn-danger btn-sm" onClick={onLogout}>
+            <LogOut size={14} /> Keluar
+          </button>
+        </div>
+      </aside>
+
+      <main className="staff-main">
+        <header className="staff-topbar">
+          <div>
+            <div className="staff-page-title">{title}</div>
+            {subtitle && <div className="staff-page-sub">{subtitle}</div>}
+          </div>
+          {actions && <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>{actions}</div>}
+        </header>
+        <div className="staff-content" key={activeMenu}>
+          {children}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export function useStoreSync(arg1, arg2) {
+  useEffect(() => {
+    let callback = null;
+    let events = [];
+
+    if (Array.isArray(arg1)) {
+      events = arg1;
+      callback = typeof arg2 === 'function' ? arg2 : null;
+    } else if (typeof arg1 === 'function') {
+      callback = arg1;
+      events = Array.isArray(arg2) ? arg2 : [];
+    }
+
+    const handler = () => {
+      if (typeof callback === 'function') {
+        try {
+          callback();
+        } catch (err) {
+          console.error('Store sync callback error:', err);
+        }
+      }
+    };
+
+    const allEvents = ['storage', ...(Array.isArray(events) ? events : [])];
+    allEvents.forEach((ev) => window.addEventListener(ev, handler));
+
+    return () => {
+      allEvents.forEach((ev) => window.removeEventListener(ev, handler));
+    };
+  }, [arg1, arg2]);
+}
+
+// ============================================================================
+// TOAST PROVIDER & HOOK NOTIFIKASI RATA KANAN-KIRI (JUSTIFY)
+// ============================================================================
+
+const ToastContext = createContext(null);
+
+export function ToastProvider({ children }) {
+  const [toasts, setToasts] = useState([]);
+
+  const addToast = (message, type = 'success', duration = 4000) => {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, duration);
+  };
+
+  const removeToast = (id) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  return (
+    <ToastContext.Provider value={{ addToast, showToast: addToast }}>
+      {children}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          zIndex: 9999,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+          maxWidth: '430px',
+          width: 'calc(100% - 48px)',
+        }}
+      >
+        {toasts.map((t) => {
+          let bg = '#1b4332';
+          let border = '#2d6a4f';
+          let icon = <CheckCircle2 size={18} style={{ color: '#4ade80' }} />;
+          if (t.type === 'error') {
+            bg = '#991b1b';
+            border = '#b91c1c';
+            icon = <XCircle size={18} style={{ color: '#fca5a5' }} />;
+          } else if (t.type === 'warning') {
+            bg = '#78350f';
+            border = '#b45309';
+            icon = <AlertTriangle size={18} style={{ color: '#fde047' }} />;
+          } else if (t.type === 'info') {
+            bg = '#1e3a8a';
+            border = '#2563eb';
+            icon = <Info size={18} style={{ color: '#93c5fd' }} />;
+          }
+
+          return (
+            <div
+              key={t.id}
+              role="alert"
+              style={{
+                backgroundColor: bg,
+                border: `1px solid ${border}`,
+                color: '#ffffff',
+                padding: '14px 18px',
+                borderRadius: '12px',
+                boxShadow: '0 10px 25px -5px rgba(0,0,0,0.25)',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '12px',
+                fontSize: '0.86rem',
+                fontWeight: 600,
+                animation: 'slideDown 0.2s ease-out',
+              }}
+            >
+              <div style={{ flexShrink: 0, marginTop: '2px' }}>{icon}</div>
+              <div
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  lineHeight: 1.45,
+                  textAlign: 'justify',
+                  wordBreak: 'break-word',
+                }}
+              >
+                {t.message}
+              </div>
+              <button
+                type="button"
+                onClick={() => removeToast(t.id)}
+                aria-label="Tutup notifikasi"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#ffffff',
+                  opacity: 0.7,
+                  cursor: 'pointer',
+                  padding: 2,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <X size={15} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </ToastContext.Provider>
+  );
+}
+
+export function useToast() {
+  const ctx = useContext(ToastContext);
+
+  const [localToast, setLocalToast] = useState(null);
+
+  const showLocalToast = (message, type = 'success') => {
+    if (ctx?.addToast) {
+      ctx.addToast(message, type);
+    } else {
+      setLocalToast({ message, type, id: Date.now() });
+    }
+  };
+
+  useEffect(() => {
+    if (!localToast) return undefined;
+    const timer = setTimeout(() => setLocalToast(null), 4500);
+    return () => clearTimeout(timer);
+  }, [localToast]);
+
+  const ToastComponent = localToast ? (
+    <div
+      key={localToast.id}
+      role="alert"
+      style={{
+        position: 'fixed',
+        bottom: '24px',
+        right: '24px',
+        zIndex: 9999,
+        maxWidth: '430px',
+        width: 'calc(100% - 48px)',
+        padding: '14px 18px',
+        borderRadius: '12px',
+        backgroundColor: localToast.type === 'error' ? '#991b1b' : '#1b4332',
+        border: localToast.type === 'error' ? '1px solid #b91c1c' : '1px solid #2d6a4f',
+        color: '#ffffff',
+        fontSize: '0.86rem',
+        fontWeight: 600,
+        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.25)',
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '12px',
+        animation: 'slideDown 0.2s ease forwards',
+      }}
+    >
+      <div
+        style={{
+          flexShrink: 0,
+          marginTop: '2px',
+          color: localToast.type === 'error' ? '#fca5a5' : '#4ade80',
+        }}
+      >
+        {localToast.type === 'error' ? <AlertTriangle size={18} /> : <CheckCircle2 size={18} />}
+      </div>
+      <div
+        style={{
+          flex: 1,
+          textAlign: 'justify',
+          lineHeight: 1.45,
+          wordBreak: 'break-word',
+        }}
+      >
+        {localToast.message}
+      </div>
+    </div>
+  ) : null;
+
+  const result = [ToastComponent, showLocalToast];
+  result.node = ToastComponent;
+  result.show = showLocalToast;
+  result.showToast = showLocalToast;
+  result.ToastComponent = ToastComponent;
+  result.toast = localToast;
+  result.addToast = showLocalToast;
+  return result;
+}
 
 // ---------- Label & warna status pesanan ----------
 export const ORDER_STATUS = {

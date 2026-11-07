@@ -1030,6 +1030,47 @@ export function formatQtyUnit(qty, unit) {
   return `${q} / ${u}`;
 }
 
+// Format stok produk: jika satuan menggunakan gram/gr atau berawalan angka (contoh: 41 / 100 GR, 22 / 10 GR, 20 / 3 BIBIT, 10 / 2,1 KG), maka diberi tanda pemisah "/"
+// Selain itu tanpa "/" (contoh: 44 Pcs, 15 Botol, 20 Ikat, 35 Polibag)
+export function formatStockUnit(stock, unit) {
+  const s = stock ?? 0;
+  const u = unit ? String(unit).trim() : '';
+  if (!u) return `${s}`;
+  if (/^\d|gr|gram/i.test(u)) {
+    return `${s} / ${u}`;
+  }
+  return `${s} ${u}`;
+}
+
+// Format kuantitas mutasi untuk notifikasi toast:
+// Jika satuan menggunakan gram (contoh: '100 GR', '250 GR', '10 GR'), dikalikan dengan kuantitas (contoh qty 1 -> 100 Gram, qty 2 -> 200 Gram)
+// Jika bukan gram (contoh: 'Sack', 'Botol', 'Pcs'), tampilkan kuantitas + unit asli (contoh: 1 Sack)
+export function formatMutationQuantity(qty, unit) {
+  const q = Number(qty) || 0;
+  const u = unit ? String(unit).trim() : '';
+  if (!u) return `${q}`;
+  
+  if (/gr|gram/i.test(u)) {
+    const match = u.match(/^(\d+(?:[.,]\d+)?)/);
+    const multiplier = match ? parseFloat(match[1].replace(',', '.')) : 1;
+    const totalGram = Math.round(q * multiplier);
+    return `${totalGram} Gram`;
+  }
+  return `${q} ${u}`;
+}
+
+// Format sisa stok untuk notifikasi toast:
+// Jika satuan gram (contoh: '100 GR'), hanya tampilkan angka stok saja tanpa '100 GR'
+// Jika bukan gram (contoh: 'Sack', 'Botol'), tampilkan angka beserta satuannya
+export function formatRemainingStockToast(stock, unit) {
+  const s = stock ?? 0;
+  const u = unit ? String(unit).trim() : '';
+  if (!u || /gr|gram/i.test(u)) {
+    return `${s}`;
+  }
+  return `${s} ${u}`;
+}
+
 export function getStoredProducts() {
   try {
     const data = localStorage.getItem(STORAGE_KEY_PRODUCTS);
