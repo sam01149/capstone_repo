@@ -1,7 +1,9 @@
 import React from 'react';
 import { ShoppingBag, LogIn, ArrowRight, MapPin } from 'lucide-react';
 
-export function LandingPage({ onGoToCatalog, onGoToLogin }) {
+export function LandingPage({ onGoToCatalog, onGoToLogin, onOpenCatalog, onOpenLogin }) {
+  const handleCatalog = onGoToCatalog || onOpenCatalog;
+  const handleLogin = onGoToLogin || onOpenLogin;
   return (
     <div
       style={{
@@ -71,7 +73,7 @@ export function LandingPage({ onGoToCatalog, onGoToLogin }) {
           {/* Door 1: Guest / Customer -> Katalog */}
           <button
             type="button"
-            onClick={onGoToCatalog}
+            onClick={handleCatalog}
             id="btn-lihat-katalog"
             style={{
               display: 'inline-flex',
@@ -107,7 +109,7 @@ export function LandingPage({ onGoToCatalog, onGoToLogin }) {
           {/* Door 2: Staff -> Login */}
           <button
             type="button"
-            onClick={onGoToLogin}
+            onClick={handleLogin}
             id="btn-masuk-staf"
             style={{
               display: 'inline-flex',

@@ -64,7 +64,21 @@ function getLocalUsers() {
   users = users.map((u) => {
     if (u.name === 'Bambang Sudarsono') {
       modified = true;
-      return { ...u, name: 'Ibu Intan Permatasari', roleTitle: 'Pemilik Toko (Super Admin)', avatar: 'IP' };
+      u = { ...u, name: 'Ibu Intan Permatasari', roleTitle: 'Pemilik Toko (Super Admin)', avatar: 'IP' };
+    }
+    // Update nomor telepon Ibu Intan (Super Admin) ke format konsisten +62 813-1000-3455
+    if (
+      u.id === 'USR-001' ||
+      u.id === 'USR-001B' ||
+      u.email === 'admin@farmberkah.com' ||
+      u.email === 'superadmin@farmberkah.com' ||
+      u.name?.toLowerCase().includes('intan') ||
+      (u.phone && (u.phone.includes('3456-7890') || u.phone.includes('34567890') || u.phone.includes('10003455') || u.phone.includes('1000-3455')))
+    ) {
+      if (u.phone !== '+62 813-1000-3455') {
+        modified = true;
+        u = { ...u, phone: '+62 813-1000-3455' };
+      }
     }
     return u;
   });
@@ -285,6 +299,20 @@ export const authService = {
         u.avatar = 'IP';
         localStorage.setItem(STORAGE_SESSION, JSON.stringify(u));
       }
+      if (
+        u &&
+        (u.id === 'USR-001' ||
+          u.id === 'USR-001B' ||
+          u.email === 'admin@farmberkah.com' ||
+          u.email === 'superadmin@farmberkah.com' ||
+          u.name?.toLowerCase().includes('intan') ||
+          (u.phone && (u.phone.includes('3456-7890') || u.phone.includes('34567890') || u.phone.includes('10003455') || u.phone.includes('1000-3455'))))
+      ) {
+        if (u.phone !== '+62 813-1000-3455') {
+          u.phone = '+62 813-1000-3455';
+          localStorage.setItem(STORAGE_SESSION, JSON.stringify(u));
+        }
+      }
       return u;
     } catch {
       return null;
@@ -460,20 +488,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => authService.getCurrentUser());
   const [loading, setLoading] = useState(false);
   const [idleNotice, setIdleNotice] = useState(false);
-  const [users, setUsers] = useState(() => {
-    try {
-      const stored = localStorage.getItem('farmsight_users_db_v1');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((u) => (u.name === 'Bambang Sudarsono' ? { ...u, name: 'Ibu Intan Permatasari', roleTitle: 'Pemilik Toko (Super Admin)', avatar: 'IP' } : u));
-        }
-      }
-    } catch {
-      // fallback
-    }
-    return INITIAL_USERS;
-  });
+  const [users, setUsers] = useState(() => getLocalUsers());
   const idleTimeoutRef = useRef(null);
 
   const syncUsers = useCallback(async () => {

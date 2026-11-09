@@ -118,8 +118,8 @@ export const OFFICIAL_STORE_INFO = {
   name: 'UMKM Toko Farm Berkah',
   tagline: 'Produk Olahan Pertanian Alami & Higienis Pulo Gebang',
   address: 'Perumahan Komplek Masnaga, Kel. Pulo Gebang, Kec. Cakung, Jakarta Timur, DKI Jakarta 13950',
-  phone: '0812-1614-6510',
-  phoneRaw: '6281216146510',
+  phone: '0813-1000-3455',
+  phoneRaw: '6281310003455',
   email: 'admin@farmberkah.com',
   qrisNmid: 'ID1026508798372',
   qrisMerchantName: 'TOKO FARM BERKAH',
@@ -698,7 +698,7 @@ export function generateStockCancelledWhatsAppUrl(order, availableStock = 0) {
 
 // 4. Helper: Generate WhatsApp URL from Customer to Sales Admin (Customer sends Proof)
 export function generateCustomerProofWhatsAppUrl(order, proofDetails = {}) {
-  const adminPhone = '6281216146510'; // WhatsApp Sales Admin Toko Farm Berkah
+  const adminPhone = '6281310003455'; // WhatsApp Sales Admin Toko Farm Berkah
   const finalAmount = proofDetails.amount || order.totalAmount;
 
   const message = [

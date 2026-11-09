@@ -18,8 +18,8 @@ export default function LupaPassword({ isOpen, onClose }) {
     name: 'Ibu Intan Permatasari',
     role: 'Pemilik & Super Admin',
     email: 'admin@farmberkah.com',
-    phone: '+62 812-1614-6510',
-    phoneClean: '6281216146510',
+    phone: '+62 813-1000-3455',
+    phoneClean: '6281310003455',
   };
 
   const requestTemplate = `Halo Ibu Intan (Super Admin Toko Farm Berkah), saya staf operasional ingin mengajukan permohonan reset kata sandi akun FarmSight saya. Mohon bantuan untuk mengatur ulang kata sandi saya. Terima kasih.`;

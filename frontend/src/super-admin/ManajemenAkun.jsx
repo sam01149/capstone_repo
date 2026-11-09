@@ -58,6 +58,27 @@ export default function ManajemenAkun({
     }
   };
 
+  // Helper Format Nomor Telepon Seragam (+62 8XX-XXXX-XXXX)
+  const formatDisplayPhone = (raw) => {
+    if (!raw) return '-';
+    const digits = String(raw).replace(/[^0-9]/g, '');
+    let rest = '';
+    if (digits.startsWith('628')) {
+      rest = digits.slice(2);
+    } else if (digits.startsWith('08')) {
+      rest = digits.slice(1);
+    } else if (digits.startsWith('8')) {
+      rest = digits;
+    }
+    if (rest.length >= 9) {
+      const part1 = rest.slice(0, 3);
+      const part2 = rest.slice(3, 7);
+      const part3 = rest.slice(7);
+      return `+62 ${part1}-${part2}-${part3}`;
+    }
+    return raw;
+  };
+
   // Helper Link WhatsApp
   const generateSharePasswordWhatsAppUrl = (account, tempPassword) => {
     const cleanPhone = (account?.phone || '').replace(/[^0-9]/g, '');
@@ -290,7 +311,7 @@ export default function ManajemenAkun({
                       <div style={{ color: '#334155', fontWeight: 600, fontSize: '0.82rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email}</div>
                       <div style={{ fontSize: '0.72rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
                         <Phone size={11} color="#94a3b8" />
-                        <span>{u.phone || '-'}</span>
+                        <span>{formatDisplayPhone(u.phone)}</span>
                       </div>
                     </td>
 

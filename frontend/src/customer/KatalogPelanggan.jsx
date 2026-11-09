@@ -242,14 +242,14 @@ export default function KatalogPelanggan({ onBackToHome, onOpenLogin, onGoToDash
       '======================================================================',
       '',
       'ALUR PEMESANAN & PEMBAYARAN VIA SALES ADMIN:',
-      '1. Kirimkan pesan pemesanan ke nomor WhatsApp Toko: 0812-1614-6510.',
+      '1. Kirimkan pesan pemesanan ke nomor WhatsApp Toko: 0813-1000-3455.',
       '2. Sales Admin akan memeriksa ketersediaan stok terlebih dahulu.',
       '3. Jika stok tersedia, Sales Admin mereservasi stok dan mengirim QRIS resmi.',
       '4. Lakukan transfer sesuai nominal dan kirimkan bukti transfer.',
       '5. Sales Admin mengonfirmasi pembayaran dan pesanan segera diproses.',
       '',
       'Alamat Toko: Komplek Masnaga, Pulo Gebang, Jakarta Timur',
-      'WhatsApp Resmi: 0812-1614-6510 | Email: admin@farmberkah.com',
+      'WhatsApp Resmi: 0813-1000-3455 | Email: admin@farmberkah.com',
       '======================================================================',
     ].join('\n');
 
@@ -309,7 +309,7 @@ export default function KatalogPelanggan({ onBackToHome, onOpenLogin, onGoToDash
       createdAt: now.toISOString(),
     });
 
-    const phone = '6281216146510';
+    const phone = '6281310003455';
     const lines = [
       'PEMESANAN - TOKO FARM BERKAH',
       '------------------------------------------',
@@ -1179,7 +1179,7 @@ export default function KatalogPelanggan({ onBackToHome, onOpenLogin, onGoToDash
                         <div style={{ fontSize: '0.72rem', color: isDetailOutOfStock ? '#dc2626' : '#718277', textAlign: 'center', marginTop: '2px', fontWeight: isDetailOutOfStock ? 600 : 400 }}>
                           {isDetailOutOfStock
                             ? 'Mohon maaf, produk ini sedang kosong dan belum dapat dipesan.'
-                            : <>WhatsApp Toko: <strong>0812-1614-6510</strong></>}
+                            : <>WhatsApp Toko: <strong>0813-1000-3455</strong></>}
                         </div>
                       </div>
                     );

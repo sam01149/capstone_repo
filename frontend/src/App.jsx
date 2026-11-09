@@ -32,14 +32,13 @@ function MainRouter() {
 
   // Root view: 'landing' | 'catalog' | 'login' | 'dashboard'
   const [currentView, setCurrentView] = useState(() => {
-    const hash = window.location.hash.replace('#', '');
-    if (hash === '/login') return 'login';
-    if (hash === '/katalog' || hash.startsWith('/katalog/')) return 'catalog';
-    if (hash.startsWith('/admin') || hash.startsWith('/inventory') || hash.startsWith('/sales') || hash === '/dashboard') {
+    const rawHash = (window.location.hash || '').replace('#', '');
+    if (rawHash === '/login') return 'login';
+    if (rawHash === '/katalog' || rawHash.startsWith('/katalog/')) return 'catalog';
+    if (rawHash.startsWith('/admin') || rawHash.startsWith('/inventory') || rawHash.startsWith('/sales') || rawHash === '/dashboard') {
       return 'dashboard';
     }
-    const saved = localStorage.getItem('farmsight_view');
-    if (saved && (saved === 'catalog' || saved === 'login' || saved === 'dashboard')) return saved;
+    // Saat awal buka / run web (root / atau #/), selalu masuk ke Landing Page terlebih dahulu
     return 'landing';
   });
 
@@ -91,6 +90,17 @@ function MainRouter() {
     }
   }, [isAuthenticated]);
 
+  // Bersihkan cache view lama agar selalu konsisten mulai dari landing page saat buka web
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('farmsight_view') === 'catalog') {
+        localStorage.removeItem('farmsight_view');
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   // Zero-Exit Browser History Management
   useEffect(() => {
     const currentHash = window.location.hash;
@@ -103,11 +113,10 @@ function MainRouter() {
     }
 
     const handleLocationChange = () => {
-      const hash = window.location.hash.replace('#', '');
+      const hash = (window.location.hash || '').replace('#', '');
 
       if (hash === '/' || hash === '') {
         setCurrentView('landing');
-        window.history.pushState({ view: 'landing' }, '', '#/');
       } else if (hash === '/katalog' || hash.startsWith('/katalog/')) {
         setCurrentView('catalog');
       } else if (hash === '/login') {
@@ -254,7 +263,7 @@ function MainRouter() {
                     Konfirmasi Keluar dari Portal?
                   </h3>
                   <p style={{ fontSize: '0.84rem', color: '#64748b', margin: 0, lineHeight: 1.5 }}>
-                    Apakah Anda yakin ingin keluar dari sesi portal staf Toko Farm Berkah? Anda harus masuk kembali untuk mengakses sistem.
+                    Apakah Anda yakin ingin keluar?
                   </p>
                 </div>
               </div>
@@ -376,8 +385,8 @@ function MainRouter() {
     );
   }
 
-  // 2. Katalog Publik Pelanggan (Hanya jika secara eksplisit membuka katalog)
-  if (currentView === 'catalog' || window.location.hash === '#/katalog' || window.location.hash.startsWith('#/katalog/')) {
+  // 2. Katalog Publik Pelanggan (Hanya jika secara eksplisit membuka katalog dan bukan di root landing)
+  if ((currentView === 'catalog' || window.location.hash.startsWith('#/katalog')) && window.location.hash !== '#/' && window.location.hash !== '' && window.location.hash !== '#') {
     return (
       <KatalogPelanggan
         onBackToHome={() => navigateTo('landing')}
@@ -391,7 +400,9 @@ function MainRouter() {
   return (
     <LandingPage
       onGoToCatalog={() => navigateTo('catalog')}
+      onOpenCatalog={() => navigateTo('catalog')}
       onGoToLogin={() => navigateTo('login')}
+      onOpenLogin={() => navigateTo('login')}
     />
   );
 }

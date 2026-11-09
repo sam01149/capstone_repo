@@ -56,7 +56,7 @@ Sistem telah dilengkapi data mock realistis Toko Farm Berkah dan 1-click autofil
 - Filter kategori & pencarian kata kunci real-time.
 - Modal detail produk dengan alt-text lengkap ramah aksesibilitas.
 - Pembelian stok habis otomatis dinonaktifkan dengan rekomendasi produk serupa.
-- **Keranjang Belanja**: Download Draft Invoice `.txt` dan tombol kirim pemesanan ke WhatsApp resmi Toko Farm Berkah (`0812-1614-6510`).
+- **Keranjang Belanja**: Download Draft Invoice `.txt` dan tombol kirim pemesanan ke WhatsApp resmi Toko Farm Berkah (`0813-1000-3455`).
 - **Batasan**: Tidak ada pembayaran langsung di katalog; pembayaran difasilitasi lewat Sales Admin.
 
 ### C. Alur Pemesanan & Pembayaran (Sales Admin)

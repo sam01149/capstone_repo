@@ -98,7 +98,7 @@ export const INITIAL_ACCOUNTS = [
     passwordHash: dummyHashPassword('admin12345'),
     role: ROLES.SUPER_ADMIN,
     roleTitle: 'Pemilik Toko Farm Berkah',
-    phone: '+62 812-1614-6510',
+    phone: '+62 813-1000-3455',
     avatar: 'IP',
     status: 'Aktif',
     must_change_password: false,
@@ -165,11 +165,30 @@ export function getStoredUsers() {
     }
     const parsed = JSON.parse(data);
     if (!Array.isArray(parsed) || parsed.length === 0) return INITIAL_ACCOUNTS;
-    return parsed.map((u) => ({
-      ...u,
-      must_change_password: Boolean(u.must_change_password),
-      passwordHash: u.passwordHash || dummyHashPassword(u.password || 'farm12345'),
-    }));
+    let modified = false;
+    const users = parsed.map((u) => {
+      let updated = {
+        ...u,
+        must_change_password: Boolean(u.must_change_password),
+        passwordHash: u.passwordHash || dummyHashPassword(u.password || 'farm12345'),
+      };
+      if (
+        updated.id === 'usr-001' ||
+        updated.name?.toLowerCase().includes('intan') ||
+        updated.email === 'admin@farmberkah.com' ||
+        (updated.phone && (updated.phone.includes('3456-7890') || updated.phone.includes('34567890') || updated.phone.includes('1614-6510') || updated.phone.includes('10003455') || updated.phone.includes('1000-3455')))
+      ) {
+        if (updated.phone !== '+62 813-1000-3455') {
+          updated.phone = '+62 813-1000-3455';
+          modified = true;
+        }
+      }
+      return updated;
+    });
+    if (modified) {
+      localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(users));
+    }
+    return users;
   } catch {
     return INITIAL_ACCOUNTS;
   }
