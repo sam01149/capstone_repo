@@ -265,6 +265,7 @@ model Order {
   cancelledAt       DateTime?       @map("cancelled_at") @db.Timestamptz(6)
   anonymizedAt      DateTime?       @map("anonymized_at") @db.Timestamptz(6)
   version           Int             @default(0)
+  payment           Json            @default("{}")
   createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
   createdBy         User?           @relation("OrderCreator", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)

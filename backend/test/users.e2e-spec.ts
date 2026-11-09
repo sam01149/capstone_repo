@@ -1,6 +1,8 @@
+import { resetTestData } from './reset-test-data.js';
 import { type INestApplication, RequestMethod } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import request from 'supertest';
+import { ThrottlerStorage, ThrottlerStorageService } from '@nestjs/throttler';
 import { AppModule } from '../src/app.module.js';
 import { configureApplication } from '../src/app.setup.js';
 import { PasswordService } from '../src/auth/password.service.js';
@@ -30,13 +32,11 @@ describe('FarmSight users API (e2e)', () => {
   });
 
   beforeEach(async () => {
+    app.get<ThrottlerStorageService>(ThrottlerStorage).onApplicationShutdown();
     await prisma.$executeRawUnsafe(
       'DROP TRIGGER IF EXISTS fail_selected_audit_trigger ON audit_logs; DROP FUNCTION IF EXISTS fail_selected_audit();',
     );
-    await prisma.auditLog.deleteMany();
-    await prisma.session.deleteMany();
-    await prisma.user.deleteMany();
-    await prisma.role.deleteMany();
+    await resetTestData(prisma);
     const [adminRole, salesRole, stockRole] = await Promise.all([
       prisma.role.create({
         data: { code: 'SUPER_ADMIN', name: 'Super Admin' },
@@ -493,6 +493,34 @@ describe('FarmSight users API (e2e)', () => {
         'DROP TRIGGER IF EXISTS fail_selected_audit_trigger ON audit_logs; DROP FUNCTION IF EXISTS fail_selected_audit();',
       );
     }
+  });
+
+  it('mengaktifkan kembali staf tanpa menghidupkan sesi lama dan membatasi akses', async () => {
+    const admin = await login('admin@example.test', 'AdminPassword123');
+    const staff = await login('staff@example.test', 'StaffPassword123');
+    await staff.agent
+      .post('/api/v1/users/' + stockId + '/activate')
+      .set('x-csrf-token', staff.csrf)
+      .expect(403);
+    await admin.agent
+      .post('/api/v1/users/' + staffId + '/deactivate')
+      .set('x-csrf-token', admin.csrf)
+      .expect(200);
+    await admin.agent
+      .post('/api/v1/users/' + staffId + '/activate')
+      .expect(403);
+    await admin.agent
+      .post('/api/v1/users/' + staffId + '/activate')
+      .set('x-csrf-token', admin.csrf)
+      .expect(200);
+    await staff.agent.get('/api/v1/auth/me').expect(401);
+    const again = await login('staff@example.test', 'StaffPassword123');
+    await again.agent.get('/api/v1/auth/me').expect(200);
+    expect(
+      await prisma.auditLog.count({
+        where: { action: 'USER_ACTIVATED', targetId: staffId },
+      }),
+    ).toBe(1);
   });
 
   afterAll(async () => {

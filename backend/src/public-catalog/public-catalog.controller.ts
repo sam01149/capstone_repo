@@ -9,6 +9,7 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../common/auth/auth.decorators.js';
 import type { RequestWithId } from '../common/auth/authenticated-request.js';
@@ -22,7 +23,15 @@ export class PublicCatalogController {
   constructor(
     private readonly catalog: PublicCatalogService,
     private readonly orders: OrdersService,
+    private readonly config: ConfigService,
   ) {}
+  @Get('settings') settings() {
+    return {
+      whatsappNumber:
+        this.config.get<string>('WHATSAPP_BUSINESS_NUMBER') ?? null,
+      qrisImageUrl: this.config.get<string>('QRIS_IMAGE_URL') ?? null,
+    };
+  }
   @Get('products') list(@Query() q: ListPublicProductsQueryDto) {
     return this.catalog.list(q);
   }

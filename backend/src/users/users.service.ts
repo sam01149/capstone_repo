@@ -275,6 +275,36 @@ export class UsersService {
     return toUserResponse(updated);
   }
 
+  async activate(actor: AuthPrincipal, userId: string, requestId: string) {
+    const user = await this.runSerializable(async (tx) => {
+      await this.lockSuperAdminInvariant(tx);
+      await this.lockUser(tx, userId);
+      const current = await tx.user.findUnique({
+        where: { id: userId },
+        select: safeUserSelect,
+      });
+      if (!current) throw this.userNotFound();
+      if (current.isActive) return current;
+      const updated = await tx.user.update({
+        where: { id: userId },
+        data: { isActive: true },
+        select: safeUserSelect,
+      });
+      await tx.auditLog.create({
+        data: {
+          actorUserId: actor.userId,
+          action: 'USER_ACTIVATED',
+          targetType: 'USER',
+          targetId: userId,
+          requestId,
+          safeMetadata: { previousStatus: 'INACTIVE', newStatus: 'ACTIVE' },
+        },
+      });
+      return updated;
+    });
+    return toUserResponse(user);
+  }
+
   async resetPassword(
     actor: AuthPrincipal,
     userId: string,

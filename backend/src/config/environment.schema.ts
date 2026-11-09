@@ -5,6 +5,7 @@ const environmentSchema = Joi.object({
     .valid('development', 'test', 'production')
     .default('development'),
   PORT: Joi.number().port().default(3000),
+  HOST: Joi.string().hostname().default('127.0.0.1'),
   DATABASE_URL: Joi.string()
     .uri({ scheme: ['postgres', 'postgresql'] })
     .required(),
@@ -39,6 +40,16 @@ const environmentSchema = Joi.object({
     .default(43200),
   WHATSAPP_BUSINESS_NUMBER: Joi.string()
     .pattern(/^\d{8,15}$/)
+    .optional(),
+  QRIS_IMAGE_URL: Joi.alternatives()
+    .try(
+      Joi.string()
+        .uri({ scheme: ['https'] })
+        .max(2048),
+      Joi.string().pattern(
+        /^\/images\/[a-zA-Z0-9_.-]+\.(?:png|jpg|jpeg|webp)$/,
+      ),
+    )
     .optional(),
   FORECAST_PYTHON_PATH: Joi.string().max(2048).optional(),
   FORECAST_WORKER_PATH: Joi.string().max(2048).optional(),

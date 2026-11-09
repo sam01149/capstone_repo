@@ -9,8 +9,12 @@ export const ORDER_SOURCES = ['PUBLIC_WHATSAPP', 'INTERNAL'] as const;
 export const ORDER_ACTIONS = [
   'SUBMIT',
   'CONFIRM',
+  'VALIDATE_STOCK',
   'COMPLETE',
   'CANCEL',
+  'MARK_QRIS_SENT',
+  'RECORD_PAYMENT',
+  'REQUEST_RETRANSFER',
 ] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 export type OrderSource = (typeof ORDER_SOURCES)[number];

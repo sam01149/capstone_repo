@@ -134,6 +134,11 @@ export class ProductsService {
           await this.assertActiveCategory(tx, dto.categoryId);
         }
 
+        if (dto.isActive === true && !current.isActive)
+          await this.assertActiveCategory(
+            tx,
+            dto.categoryId ?? current.categoryId,
+          );
         const data: Prisma.ProductUpdateInput = {};
         const changedFields: string[] = [];
         this.assign(data, changedFields, 'sku', dto.sku, current.sku);
@@ -141,6 +146,13 @@ export class ProductsService {
           data.skuNormalized = normalizeKey(dto.sku);
         }
         this.assign(data, changedFields, 'name', dto.name, current.name);
+        this.assign(
+          data,
+          changedFields,
+          'isActive',
+          dto.isActive,
+          current.isActive,
+        );
         this.assign(
           data,
           changedFields,

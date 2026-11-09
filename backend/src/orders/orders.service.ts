@@ -12,6 +12,7 @@ import type { CreatePublicDraftDto } from './dto/create-public-draft.dto.js';
 import type { ListOrdersQueryDto } from './dto/list-orders-query.dto.js';
 import type { OrderItemDto } from './dto/order-item.dto.js';
 import type { UpdateOrderDto } from './dto/update-order.dto.js';
+import type { TransitionOrderDto } from './dto/transition-order.dto.js';
 import type { OrderAction, OrderStatus } from './order.constants.js';
 import { DRAFT_TTL_MS, PII_RETENTION_MS } from './order.constants.js';
 import {
@@ -117,7 +118,7 @@ export class OrdersService {
 
   async findOne(id: string) {
     await this.maintenance();
-    return this.map(await this.find(id), true);
+    return this.map(await this.find(id), true, true);
   }
 
   async update(
@@ -203,9 +204,14 @@ export class OrdersService {
     action: OrderAction,
     key: string | undefined,
     requestId: string,
+    paymentInput?: TransitionOrderDto,
   ) {
     this.assertKey(key);
-    const hash = this.hash({ id, action });
+    const hash = this.hash({
+      id,
+      action,
+      ...(paymentInput ? { paymentInput } : {}),
+    });
     let result: OrderRecord;
     try {
       result = await this.executeIdempotent(key!, action, hash, () =>
@@ -221,6 +227,9 @@ export class OrdersService {
           const previousStatus = order.status;
           const now = new Date();
           let next: OrderStatus;
+          const payment = {
+            ...((order.payment ?? {}) as Record<string, Prisma.InputJsonValue>),
+          };
           if (action === 'SUBMIT' && order.status === 'DRAFT') {
             if (order.expiresAt && order.expiresAt <= now)
               throw new ApiError(
@@ -230,15 +239,93 @@ export class OrdersService {
               );
             next = 'PENDING_CONFIRMATION';
           } else if (
-            action === 'CONFIRM' &&
+            ['CONFIRM', 'VALIDATE_STOCK'].includes(action) &&
             order.status === 'PENDING_CONFIRMATION'
           ) {
             next = 'CONFIRMED';
-            await this.confirm(tx, order);
+            try {
+              await this.confirm(tx, order);
+            } catch (error) {
+              if (
+                action !== 'VALIDATE_STOCK' ||
+                ![
+                  'ORDER_STOCK_INSUFFICIENT',
+                  'ORDER_ITEM_PRODUCT_INACTIVE',
+                ].includes(String(this.apiErrorCode(error) ?? ''))
+              )
+                throw error;
+              next = 'CANCELLED';
+              payment.note =
+                'Pesanan dibatalkan karena stok tersedia tidak mencukupi atau produk tidak aktif. Hubungi pelanggan melalui WhatsApp.';
+              payment.cancellationReason = String(this.apiErrorCode(error));
+              await tx.notification.create({
+                data: {
+                  kind: 'ORDER_STOCK_INSUFFICIENT',
+                  targetId: id,
+                  recipientRole: 'SALES_ADMIN',
+                  active: false,
+                  message:
+                    'Pesanan ' +
+                    order.publicCode +
+                    ' dibatalkan saat validasi ketersediaan stok.',
+                },
+              });
+            }
           } else if (action === 'COMPLETE' && order.status === 'CONFIRMED') {
+            if (
+              !order.stockDeductedAt &&
+              (payment.status !== 'RECEIVED' ||
+                payment.amount !== order.totalAmount)
+            )
+              throw new ApiError(
+                409,
+                'PAYMENT_REVIEW_REQUIRED',
+                'Catat bukti dengan nominal sesuai tagihan sebelum mengonfirmasi pembayaran.',
+              );
             next = 'COMPLETED';
+            payment.status = 'VERIFIED';
+            payment.verifiedAt = now.toISOString();
+            payment.verifiedBy = actor.userId;
             if (!order.stockDeductedAt)
               await this.settleReservation(tx, order, actor, now, true);
+          } else if (
+            ['MARK_QRIS_SENT', 'RECORD_PAYMENT', 'REQUEST_RETRANSFER'].includes(
+              action,
+            ) &&
+            order.status === 'CONFIRMED' &&
+            !order.stockDeductedAt
+          ) {
+            next = 'CONFIRMED';
+            if (action === 'MARK_QRIS_SENT')
+              payment.qrisSentAt = now.toISOString();
+            if (action === 'RECORD_PAYMENT') {
+              if (!paymentInput?.amount || !paymentInput.proofImage)
+                throw new ApiError(
+                  400,
+                  'PAYMENT_INPUT_REQUIRED',
+                  'Nominal transfer dan foto bukti wajib diisi.',
+                );
+              this.validateProof(paymentInput.proofImage);
+              payment.status = 'RECEIVED';
+              payment.amount = paymentInput.amount;
+              payment.proofImage = paymentInput.proofImage;
+              payment.receivedAt = now.toISOString();
+              payment.receivedBy = actor.userId;
+              payment.note = paymentInput.note ?? '';
+            }
+            if (action === 'REQUEST_RETRANSFER') {
+              if (payment.status !== 'RECEIVED')
+                throw new ApiError(
+                  409,
+                  'PAYMENT_REVIEW_REQUIRED',
+                  'Belum ada bukti pembayaran untuk diperiksa.',
+                );
+              payment.status = 'RETRANSFER_REQUIRED';
+              payment.note =
+                paymentInput?.note ??
+                'Mohon kirim bukti atau transfer yang sesuai.';
+              delete payment.proofImage;
+            }
           } else if (
             action === 'CANCEL' &&
             (['DRAFT', 'PENDING_CONFIRMATION'].includes(order.status) ||
@@ -256,8 +343,12 @@ export class OrdersService {
           const data: Prisma.OrderUpdateInput = {
             status: next,
             version: { increment: 1 },
+            payment,
           };
-          if (next === 'CONFIRMED') {
+          if (
+            ['CONFIRM', 'VALIDATE_STOCK'].includes(action) &&
+            next === 'CONFIRMED'
+          ) {
             data.confirmedAt = now;
             data.confirmedBy = { connect: { id: actor.userId } };
           }
@@ -602,6 +693,7 @@ export class OrdersService {
         customerEmail: null,
         customerAddress: null,
         anonymizedAt: now,
+        payment: {},
       },
     });
   }
@@ -734,12 +826,48 @@ export class OrdersService {
           message.includes('40P01')))
     );
   }
-  private map(o: OrderRecord, internal: boolean) {
+  private validateProof(value: string) {
+    const match =
+      /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(value);
+    if (!match)
+      throw new ApiError(
+        400,
+        'PAYMENT_PROOF_INVALID',
+        'Bukti harus berupa gambar PNG, JPEG, atau WebP.',
+      );
+    const bytes = Buffer.from(match[2], 'base64');
+    const valid =
+      bytes.length >= 24 &&
+      (match[1] === 'png'
+        ? bytes
+            .subarray(0, 8)
+            .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+        : match[1] === 'jpeg'
+          ? bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255
+          : bytes.toString('ascii', 0, 4) === 'RIFF' &&
+            bytes.toString('ascii', 8, 12) === 'WEBP');
+    if (
+      !valid ||
+      bytes.length > 750000 ||
+      bytes.toString('base64') !== match[2]
+    )
+      throw new ApiError(
+        400,
+        'PAYMENT_PROOF_INVALID',
+        'Isi gambar bukti tidak valid atau melebihi 750 KB.',
+      );
+  }
+
+  private map(o: OrderRecord, internal: boolean, includeProof = false) {
+    const payment = { ...((o.payment ?? {}) as Record<string, unknown>) };
+    const hasProof = Boolean(payment.proofImage);
+    if (!includeProof) delete payment.proofImage;
     return {
       id: internal ? o.id : undefined,
       publicCode: o.publicCode,
       source: o.source,
       status: o.status,
+      payment: internal ? { ...payment, hasProof } : undefined,
       customer: internal
         ? {
             name: o.customerName,

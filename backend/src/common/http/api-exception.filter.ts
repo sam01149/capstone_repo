@@ -21,11 +21,31 @@ export class ApiExceptionFilter implements ExceptionFilter {
     const request = http.getRequest<RequestWithId>();
     const response = http.getResponse<Response>();
     const isHttp = exception instanceof HttpException;
-    const status = isHttp
-      ? exception.getStatus()
-      : HttpStatus.INTERNAL_SERVER_ERROR;
+    const parserError =
+      exception && typeof exception === 'object'
+        ? (exception as { type?: string })
+        : undefined;
+    const parserStatus =
+      parserError?.type === 'entity.too.large'
+        ? 413
+        : parserError?.type === 'entity.parse.failed'
+          ? 400
+          : undefined;
+    const status =
+      parserStatus ??
+      (isHttp ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR);
     const raw = isHttp ? exception.getResponse() : undefined;
-    const body: ApiErrorBody = typeof raw === 'object' ? raw : {};
+    const body: ApiErrorBody = parserStatus
+      ? {
+          code: parserStatus === 413 ? 'PAYLOAD_TOO_LARGE' : 'INVALID_JSON',
+          message:
+            parserStatus === 413
+              ? 'Ukuran permintaan melebihi batas yang diizinkan.'
+              : 'Format JSON tidak valid.',
+        }
+      : typeof raw === 'object'
+        ? raw
+        : {};
     const validationMessages = Array.isArray(body.message) ? body.message : [];
 
     response.status(status).json({

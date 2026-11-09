@@ -1,5 +1,6 @@
 import { Transform, Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsInt,
   IsOptional,
   IsIn,
@@ -29,6 +30,9 @@ const nullableText = ({ value }: { value: unknown }) =>
       : value;
 
 export class UpdateProductDto {
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
   @ValidateIf((_object, value) => value !== undefined)
   @Transform(trim)
   @IsString()

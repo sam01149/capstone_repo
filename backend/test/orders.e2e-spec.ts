@@ -1,3 +1,4 @@
+import { resetTestData } from './reset-test-data.js';
 import { randomUUID } from 'node:crypto';
 import { type INestApplication, RequestMethod } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
@@ -33,17 +34,7 @@ describe('FarmSight order and public catalog API (e2e)', () => {
     await prisma.$executeRawUnsafe(
       'DROP TRIGGER IF EXISTS fail_workflow_notification_trigger ON notifications; DROP FUNCTION IF EXISTS fail_workflow_notification(); DROP TRIGGER IF EXISTS fail_workflow_settlement_trigger ON audit_logs; DROP FUNCTION IF EXISTS fail_workflow_settlement();',
     );
-    await prisma.orderMutation.deleteMany();
-    await prisma.stockMovement.deleteMany();
-    await prisma.orderItem.deleteMany();
-    await prisma.order.deleteMany();
-    await prisma.inventoryBalance.deleteMany();
-    await prisma.product.deleteMany();
-    await prisma.category.deleteMany();
-    await prisma.auditLog.deleteMany();
-    await prisma.session.deleteMany();
-    await prisma.user.deleteMany();
-    await prisma.role.deleteMany();
+    await resetTestData(prisma);
 
     const [adminRole, salesRole, stockRole] = await Promise.all([
       prisma.role.create({
@@ -127,12 +118,43 @@ describe('FarmSight order and public catalog API (e2e)', () => {
       .expect(201);
   }
 
+  const paymentProof =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jOuoAAAAASUVORK5CYII=';
+  async function recordPayment(
+    actor: Awaited<ReturnType<typeof login>>,
+    id: string,
+    amount?: number,
+  ) {
+    const current = await actor.agent.get('/api/v1/orders/' + id).expect(200);
+    return actor.agent
+      .post('/api/v1/orders/' + id + '/transition')
+      .set('x-csrf-token', actor.csrf)
+      .set('idempotency-key', randomUUID())
+      .send({
+        action: 'RECORD_PAYMENT',
+        amount: amount ?? current.body.data.totalAmount,
+        proofImage: paymentProof,
+      })
+      .expect(201);
+  }
+
   async function transition(
     actor: Awaited<ReturnType<typeof login>>,
     orderId: string,
     action: string,
     expected = 201,
   ) {
+    if (action === 'COMPLETE' && expected !== 409 && expected !== 403) {
+      const current = await actor.agent
+        .get('/api/v1/orders/' + orderId)
+        .expect(200);
+      if (
+        current.body.data.status === 'CONFIRMED' &&
+        !current.body.data.stockDeductedAt &&
+        current.body.data.payment.status !== 'RECEIVED'
+      )
+        await recordPayment(actor, orderId);
+    }
     return actor.agent
       .post(`/api/v1/orders/${orderId}/transition`)
       .set('x-csrf-token', actor.csrf)
@@ -296,6 +318,7 @@ describe('FarmSight order and public catalog API (e2e)', () => {
       .set('idempotency-key', randomUUID())
       .send({ customerName: 'Tidak Boleh' })
       .expect(409);
+    await recordPayment(sales, orderId);
     const completeKey = randomUUID();
     const complete = () =>
       sales.agent
@@ -886,6 +909,7 @@ describe('FarmSight order and public catalog API (e2e)', () => {
         .set('x-csrf-token', sales.csrf)
         .set('idempotency-key', randomUUID())
         .send({ action });
+    await recordPayment(sales, id);
     const responses = await Promise.all([act('COMPLETE'), act('CANCEL')]);
     expect(responses.map((r) => r.status).sort()).toEqual([201, 409]);
     const final = await prisma.order.findUniqueOrThrow({ where: { id } });
@@ -900,6 +924,205 @@ describe('FarmSight order and public catalog API (e2e)', () => {
     expect(await prisma.stockMovement.count()).toBe(
       final.status === 'COMPLETED' ? 1 : 0,
     );
+  });
+
+  it('menegakkan bukti, nominal, privasi dan idempotensi alur pembayaran manual', async () => {
+    const sales = await login('sales.orders@example.test', 'SalesPassword123');
+    const stock = await login('stock.orders@example.test', 'StockPassword123');
+    const created = await createInternal(sales, '2');
+    const id = created.body.data.id as string;
+    await transition(sales, id, 'SUBMIT');
+    await transition(sales, id, 'CONFIRM');
+    const send = (body: object, key = randomUUID()) =>
+      sales.agent
+        .post('/api/v1/orders/' + id + '/transition')
+        .set('x-csrf-token', sales.csrf)
+        .set('idempotency-key', key)
+        .send(body);
+    await send({ action: 'COMPLETE' }).expect(409);
+    await send({
+      action: 'RECORD_PAYMENT',
+      amount: 50000,
+      proofImage: 'data:image/svg+xml;base64,PHN2Zz4=',
+    }).expect(400);
+    await send({
+      action: 'RECORD_PAYMENT',
+      amount: 50000,
+      proofImage: 'data:image/png;base64,PHNjcmlwdD4=',
+    }).expect(400);
+    await send({
+      action: 'RECORD_PAYMENT',
+      amount: 0,
+      proofImage: paymentProof,
+    }).expect(400);
+    await stock.agent.get('/api/v1/orders/' + id).expect(403);
+    await stock.agent
+      .post('/api/v1/orders/' + id + '/transition')
+      .set('x-csrf-token', stock.csrf)
+      .set('idempotency-key', randomUUID())
+      .send({
+        action: 'RECORD_PAYMENT',
+        amount: 50000,
+        proofImage: paymentProof,
+      })
+      .expect(403);
+    await sales.agent
+      .post('/api/v1/orders/' + id + '/transition')
+      .set('idempotency-key', randomUUID())
+      .send({ action: 'MARK_QRIS_SENT' })
+      .expect(403);
+    await send({ action: 'MARK_QRIS_SENT' }).expect(201);
+    await recordPayment(sales, id, 49000);
+    await send({ action: 'COMPLETE' }).expect(409);
+    expect(
+      (
+        await prisma.inventoryBalance.findUniqueOrThrow({
+          where: { productId },
+        })
+      ).currentStock.toFixed(3),
+    ).toBe('10.000');
+    await send({
+      action: 'REQUEST_RETRANSFER',
+      note: 'Nominal belum sesuai',
+    }).expect(201);
+    await send({ action: 'COMPLETE' }).expect(409);
+    const key = randomUUID();
+    const body = {
+      action: 'RECORD_PAYMENT',
+      amount: 50000,
+      proofImage: paymentProof,
+    };
+    await send(body, key).expect(201);
+    await send(body, key).expect(201);
+    await send({ ...body, amount: 51000 }, key).expect(409);
+    const list = await sales.agent.get('/api/v1/orders').expect(200);
+    expect(list.body.data.items[0].payment).toMatchObject({
+      hasProof: true,
+      status: 'RECEIVED',
+      amount: 50000,
+    });
+    expect(list.body.data.items[0].payment).not.toHaveProperty('proofImage');
+    const detail = await sales.agent.get('/api/v1/orders/' + id).expect(200);
+    expect(detail.headers['cache-control']).toBe('no-store');
+    expect(detail.body.data.payment.proofImage).toBe(paymentProof);
+    const completeKey = randomUUID();
+    await send({ action: 'COMPLETE' }, completeKey).expect(201);
+    await send({ action: 'COMPLETE' }, completeKey).expect(201);
+    expect(
+      (
+        await prisma.inventoryBalance.findUniqueOrThrow({
+          where: { productId },
+        })
+      ).currentStock.toFixed(3),
+    ).toBe('8.000');
+    expect(await prisma.stockMovement.count()).toBe(1);
+    expect(
+      (await prisma.order.findUniqueOrThrow({ where: { id } })).payment,
+    ).toMatchObject({ status: 'VERIFIED', amount: 50000 });
+    const logs = await prisma.auditLog.findMany({ where: { targetId: id } });
+    expect(JSON.stringify(logs)).not.toContain(paymentProof);
+    await send({
+      action: 'RECORD_PAYMENT',
+      amount: 50000,
+      proofImage: paymentProof,
+    }).expect(409);
+  });
+
+  it('merahasiakan metadata pembayaran dari draft publik dan membersihkannya saat retensi', async () => {
+    const draft = await request(app.getHttpServer())
+      .post('/api/v1/public/order-drafts')
+      .set('idempotency-key', randomUUID())
+      .send({
+        customerName: 'Uji Publik',
+        customerPhone: '080000000000',
+        items: items(),
+      })
+      .expect(201);
+    expect(draft.body.data).not.toHaveProperty('payment');
+    const sales = await login('sales.orders@example.test', 'SalesPassword123');
+    const order = await prisma.order.findUniqueOrThrow({
+      where: { publicCode: draft.body.data.publicCode },
+    });
+    await transition(sales, order.id, 'SUBMIT');
+    await transition(sales, order.id, 'CONFIRM');
+    await recordPayment(sales, order.id);
+    await transition(sales, order.id, 'COMPLETE');
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { completedAt: new Date(Date.now() - 91 * 86400000) },
+    });
+    const detail = await sales.agent
+      .get('/api/v1/orders/' + order.id)
+      .expect(200);
+    expect(detail.body.data.payment.hasProof).toBe(false);
+    expect(detail.body.data.customer.anonymized).toBe(true);
+  });
+
+  it('validasi alur Novita mencadangkan stok cukup atau membatalkan stok kurang secara atomik', async () => {
+    const sales = await login('sales.orders@example.test', 'SalesPassword123');
+    const good = await createInternal(sales, '2');
+    await transition(sales, good.body.data.id, 'SUBMIT');
+    const reserved = await transition(
+      sales,
+      good.body.data.id,
+      'VALIDATE_STOCK',
+    );
+    expect(reserved.body.data.status).toBe('CONFIRMED');
+    const bad = await createInternal(sales, '9');
+    const id = bad.body.data.id as string;
+    await transition(sales, id, 'SUBMIT');
+    const key = randomUUID();
+    const validate = () =>
+      sales.agent
+        .post('/api/v1/orders/' + id + '/transition')
+        .set('x-csrf-token', sales.csrf)
+        .set('idempotency-key', key)
+        .send({ action: 'VALIDATE_STOCK' });
+    const cancelled = await validate().expect(201);
+    expect(cancelled.body.data.status).toBe('CANCELLED');
+    await validate().expect(201);
+    const balance = await prisma.inventoryBalance.findUniqueOrThrow({
+      where: { productId },
+    });
+    expect(balance.currentStock.toFixed(3)).toBe('10.000');
+    expect(balance.reservedStock.toFixed(3)).toBe('2.000');
+    expect(await prisma.stockMovement.count()).toBe(0);
+    expect(
+      await prisma.notification.count({
+        where: { kind: 'ORDER_STOCK_INSUFFICIENT', targetId: id },
+      }),
+    ).toBe(1);
+    const rollback = await createInternal(sales, '11');
+    const rollbackId = rollback.body.data.id as string;
+    await transition(sales, rollbackId, 'SUBMIT');
+    await prisma.$executeRawUnsafe(
+      "CREATE FUNCTION fail_workflow_notification() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.kind = 'ORDER_STOCK_INSUFFICIENT' THEN RAISE EXCEPTION 'forced'; END IF; RETURN NEW; END $$; CREATE TRIGGER fail_workflow_notification_trigger BEFORE INSERT ON notifications FOR EACH ROW EXECUTE FUNCTION fail_workflow_notification();",
+    );
+    try {
+      await transition(sales, rollbackId, 'VALIDATE_STOCK', 500);
+      expect(
+        (await prisma.order.findUniqueOrThrow({ where: { id: rollbackId } }))
+          .status,
+      ).toBe('PENDING_CONFIRMATION');
+    } finally {
+      await prisma.$executeRawUnsafe(
+        'DROP TRIGGER fail_workflow_notification_trigger ON notifications; DROP FUNCTION fail_workflow_notification();',
+      );
+    }
+  });
+
+  it('menolak payload bukti berlebihan dan JSON rusak dengan error yang jelas', async () => {
+    const large = await request(app.getHttpServer())
+      .post('/api/v1/orders')
+      .send({ proofImage: 'x'.repeat(1200000) })
+      .expect(413);
+    expect(large.body.error.code).toBe('PAYLOAD_TOO_LARGE');
+    const invalid = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .set('content-type', 'application/json')
+      .send('{broken')
+      .expect(400);
+    expect(invalid.body.error.code).toBe('INVALID_JSON');
   });
 
   afterAll(async () => {

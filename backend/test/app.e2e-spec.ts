@@ -1,3 +1,4 @@
+import { resetTestData } from './reset-test-data.js';
 import { type INestApplication, RequestMethod } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import request from 'supertest';
@@ -27,10 +28,7 @@ describe('FarmSight auth API (e2e)', () => {
   });
 
   beforeEach(async () => {
-    await prisma.auditLog.deleteMany();
-    await prisma.session.deleteMany();
-    await prisma.user.deleteMany();
-    await prisma.role.deleteMany();
+    await resetTestData(prisma);
     const [adminRole, salesRole, stockRole] = await Promise.all([
       prisma.role.create({
         data: { code: 'SUPER_ADMIN', name: 'Super Admin' },
