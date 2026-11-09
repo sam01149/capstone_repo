@@ -14,7 +14,10 @@ async function bootstrap() {
   });
   app.enableShutdownHooks();
 
-  await app.listen(config.getOrThrow<number>('PORT'));
+  await app.listen(
+    config.getOrThrow<number>('PORT'),
+    config.getOrThrow<string>('HOST'),
+  );
 }
 
 await bootstrap();

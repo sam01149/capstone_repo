@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Headers,
+  Header,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -22,10 +23,14 @@ import { OrdersService } from './orders.service.js';
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly orders: OrdersService) {}
-  @Get() list(@Query() q: ListOrdersQueryDto) {
+  @Header('Cache-Control', 'no-store')
+  @Get()
+  list(@Query() q: ListOrdersQueryDto) {
     return this.orders.list(q);
   }
-  @Get(':id') find(@Param('id', new ParseUUIDPipe()) id: string) {
+  @Header('Cache-Control', 'no-store')
+  @Get(':id')
+  find(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.orders.findOne(id);
   }
   @Post() create(
@@ -49,6 +54,13 @@ export class OrdersController {
     @Headers('idempotency-key') key: string | undefined,
     @Req() req: AuthenticatedRequest,
   ) {
-    return this.orders.transition(req.auth, id, dto.action, key, req.requestId);
+    return this.orders.transition(
+      req.auth,
+      id,
+      dto.action,
+      key,
+      req.requestId,
+      dto,
+    );
   }
 }

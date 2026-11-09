@@ -1,3 +1,4 @@
+import { resetTestData } from './reset-test-data.js';
 import { type INestApplication, RequestMethod } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 import request from 'supertest';
@@ -29,17 +30,7 @@ describe('FarmSight product catalog API (e2e)', () => {
     await prisma.$executeRawUnsafe(
       'DROP TRIGGER IF EXISTS fail_catalog_audit_trigger ON audit_logs; DROP FUNCTION IF EXISTS fail_catalog_audit();',
     );
-    await prisma.orderMutation.deleteMany();
-    await prisma.stockMovement.deleteMany();
-    await prisma.orderItem.deleteMany();
-    await prisma.order.deleteMany();
-    await prisma.inventoryBalance.deleteMany();
-    await prisma.product.deleteMany();
-    await prisma.category.deleteMany();
-    await prisma.auditLog.deleteMany();
-    await prisma.session.deleteMany();
-    await prisma.user.deleteMany();
-    await prisma.role.deleteMany();
+    await resetTestData(prisma);
     const [adminRole, salesRole, stockRole] = await Promise.all([
       prisma.role.create({
         data: { code: 'SUPER_ADMIN', name: 'Super Admin' },
@@ -529,6 +520,67 @@ describe('FarmSight product catalog API (e2e)', () => {
         'DROP TRIGGER IF EXISTS fail_catalog_audit_trigger ON audit_logs; DROP FUNCTION IF EXISTS fail_catalog_audit();',
       );
     }
+  });
+
+  it('menyelaraskan visibilitas katalog dengan aktivasi produk dan kategori aktif', async () => {
+    const admin = await login(
+      'admin.products@example.test',
+      'AdminPassword123',
+    );
+    const stock = await login(
+      'stock.products@example.test',
+      'StockPassword123',
+    );
+    const category = await prisma.category.create({
+      data: {
+        name: 'Kategori Uji',
+        nameNormalized: 'kategori uji',
+        slug: 'kategori-uji',
+      },
+    });
+    const created = await admin.agent
+      .post('/api/v1/products')
+      .set('x-csrf-token', admin.csrf)
+      .send(productPayload(category.id))
+      .expect(201);
+    const id = created.body.data.id;
+    await stock.agent
+      .patch('/api/v1/products/' + id)
+      .set('x-csrf-token', stock.csrf)
+      .send({ isActive: false })
+      .expect(403);
+    await admin.agent
+      .patch('/api/v1/products/' + id)
+      .set('x-csrf-token', admin.csrf)
+      .send({ isActive: false })
+      .expect(200);
+    expect(
+      (await request(app.getHttpServer()).get('/api/v1/public/products')).body
+        .data.items,
+    ).toHaveLength(0);
+    await admin.agent
+      .patch('/api/v1/products/' + id)
+      .set('x-csrf-token', admin.csrf)
+      .send({ isActive: true })
+      .expect(200);
+    expect(
+      (await request(app.getHttpServer()).get('/api/v1/public/products')).body
+        .data.items,
+    ).toHaveLength(1);
+    await admin.agent
+      .patch('/api/v1/products/' + id)
+      .set('x-csrf-token', admin.csrf)
+      .send({ isActive: false })
+      .expect(200);
+    await prisma.category.update({
+      where: { id: category.id },
+      data: { isActive: false },
+    });
+    await admin.agent
+      .patch('/api/v1/products/' + id)
+      .set('x-csrf-token', admin.csrf)
+      .send({ isActive: true })
+      .expect(409);
   });
 
   afterAll(async () => {

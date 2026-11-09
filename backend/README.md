@@ -1,5 +1,20 @@
 # FarmSight Backend
 
+## Integrasi frontend dan pembayaran manual ? 9 November 2026
+
+Frontend tersedia pada folder frontend; cara menjalankan seluruh stack ada di README root. Desain dashboard final akan dikerjakan FE; antarmuka operasional saat ini bersifat sementara untuk UAT integrasi.
+
+Action transisi baru pada POST /api/v1/orders/:id/transition: VALIDATE_STOCK memvalidasi PENDING_CONFIRMATION lalu reserve/CONFIRMED, atau membatalkan/CANCELLED secara atomik jika stok kurang/produk tidak aktif. CONFIRM tetap tersedia sebagai kontrak rendah sebelumnya (stok kurang tetap error). MARK_QRIS_SENT mencatat penandaan manual; RECORD_PAYMENT meminta amount integer rupiah positif dan proofImage data URL PNG/JPEG/WebP maksimal 750 KB; REQUEST_RETRANSFER meminta bukti ulang. COMPLETE kini memerlukan bukti RECEIVED dengan nominal sama dengan total, memverifikasi pembayaran manual dan menyelesaikan order/SALE_OUT secara atomik. Order legacy yang sudah stock out tetap dilindungi dari pemotongan ulang.
+
+Migration 20261109090000_manual_payment_workflow menambah orders.payment JSONB. Foto bukti hanya terdapat pada detail order internal, tidak pada list/public/log/audit; foto dihapus bersama metadata pembayaran pada anonimisasi 90 hari. Detail/list order memakai Cache-Control no-store. Tidak ada verifikasi bank otomatis atau pengiriman WhatsApp otomatis. JSON request dibatasi 1100 KB; gambar dibatasi dan signature tipe diperiksa.
+
+PATCH /products/:id menerima isActive boolean untuk sembunyikan/tampilkan produk; reaktivasi memerlukan kategori aktif. POST /users/:id/activate khusus Super Admin mengaktifkan staf tanpa memulihkan sesi yang sudah dicabut. GET /public/settings mengembalikan konfigurasi kontak toko/URL QRIS publik saja.
+
+HOST default 127.0.0.1; deployment yang memerlukan bind semua interface harus mengatur HOST secara eksplisit. FRONTEND_ORIGIN lokal tetap http://localhost:5173. Cookie HttpOnly, CSRF, idempotensi dan RBAC server dipertahankan. QRIS_IMAGE_URL opsional berupa HTTPS atau /images/nama-file dengan ekstensi PNG/JPG/JPEG/WebP. Jangan commit nomor pribadi, gambar bukti atau kredensial UAT.
+
+Catatan berikut sebagian bersifat historis; rincian alur terbaru di atas menggantikan pernyataan bahwa COMPLETE tidak memerlukan pemeriksaan bukti atau bahwa stok dipotong pada CONFIRM.
+
+
 Backend FarmSight menggunakan NestJS, Prisma ORM, dan PostgreSQL. Autentikasi/RBAC, pengguna internal, kategori/master produk, inventory, katalog publik, draft WhatsApp, pesanan, serta integrasi movement penjualan telah tersedia; frontend serta modul bisnis lain dikerjakan pada paket terpisah.
 
 ## Alur reservasi dan notifikasi pesanan

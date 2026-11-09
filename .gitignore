@@ -41,3 +41,6 @@ exports/
 /.github/
 /.gitattributes
 /scripts/
+
+# QRIS is configured locally and must be reviewed before publication
+/frontend/public/images/qris-farm-berkah.jpg

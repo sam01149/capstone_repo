@@ -1,3 +1,4 @@
+import { resetTestData } from './reset-test-data.js';
 import { randomUUID } from 'node:crypto';
 import { type INestApplication, RequestMethod } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -61,20 +62,7 @@ describe('forecast history import (e2e)', () => {
     await prisma.$executeRawUnsafe(
       'DROP TRIGGER IF EXISTS fail_forecast_audit_trigger ON audit_logs; DROP FUNCTION IF EXISTS fail_forecast_audit();',
     );
-    await prisma.forecastRun.deleteMany();
-    await prisma.demandWeek.deleteMany();
-    await prisma.forecastDataset.deleteMany();
-    await prisma.orderMutation.deleteMany();
-    await prisma.stockMovement.deleteMany();
-    await prisma.orderItem.deleteMany();
-    await prisma.order.deleteMany();
-    await prisma.inventoryBalance.deleteMany();
-    await prisma.product.deleteMany();
-    await prisma.category.deleteMany();
-    await prisma.auditLog.deleteMany();
-    await prisma.session.deleteMany();
-    await prisma.user.deleteMany();
-    await prisma.role.deleteMany();
+    await resetTestData(prisma);
     const roles = await Promise.all(
       ['SUPER_ADMIN', 'STOCK_MANAGER', 'SALES_ADMIN'].map((code) =>
         prisma.role.create({ data: { code, name: code } }),

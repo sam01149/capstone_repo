@@ -70,6 +70,15 @@ export class UsersController {
     return this.users.deactivate(request.auth, userId, request.requestId);
   }
 
+  @Post(':id/activate')
+  @HttpCode(HttpStatus.OK)
+  activate(
+    @Param('id', new ParseUUIDPipe()) userId: string,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.users.activate(request.auth, userId, request.requestId);
+  }
+
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post(':id/reset-password')
   @HttpCode(HttpStatus.OK)
